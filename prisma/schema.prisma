@@ -1,0 +1,747 @@
+// Joe Real Estate OS — core schema (Phase 1)
+// Better Auth identity tables + CRM tenancy domain
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  AGENT
+  ASSISTANT
+}
+
+enum ContactType {
+  LEAD
+  BUYER
+  SELLER
+  PAST_CLIENT
+  SPHERE
+  VENDOR
+  AGENT
+  LENDER
+  ATTORNEY
+  TITLE
+  INVESTOR
+  OTHER
+}
+
+enum LifecycleStage {
+  NEW
+  CONTACTED
+  ENGAGED
+  QUALIFIED
+  APPOINTMENT
+  ACTIVE_CLIENT
+  UNDER_CONTRACT
+  CLOSED
+  PAST_CLIENT
+  NURTURE
+  LOST
+}
+
+enum LeadTemperature {
+  COLD
+  WARM
+  HOT
+}
+
+enum OpportunityType {
+  BUYER
+  SELLER
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  SMS
+  NOTE
+  MEETING
+  APPOINTMENT
+  TASK
+  PROPERTY_VIEW
+  SHOWING
+  OPEN_HOUSE
+  OFFER
+  CONTRACT
+  STATUS_CHANGE
+  LEAD_ASSIGNMENT
+  CAMPAIGN_INTERACTION
+  WEBSITE_ACTIVITY
+  AI_ACTION
+  SYSTEM
+}
+
+enum TaskStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+  SNOOZED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum PropertyStatus {
+  UNKNOWN
+  PRE_LISTING
+  ACTIVE
+  PENDING
+  SOLD
+  EXPIRED
+  WITHDRAWN
+  CANCELLED
+  OFF_MARKET
+}
+
+enum DataProvenance {
+  USER_ENTERED
+  IMPORTED
+  VERIFIED
+  CALCULATED
+  AI_INFERENCE
+}
+
+enum ContactFactSource {
+  USER
+  CONVERSATION
+  IMPORT
+  AI
+  SYSTEM
+}
+
+enum FactConfidence {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ContactPropertyRole {
+  OWNER
+  BUYER_INTEREST
+  LISTING_CLIENT
+  TENANT
+  PREVIOUS_OWNER
+  OTHER
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  EXITED
+  ERROR
+}
+
+enum AuditSource {
+  USER
+  SYSTEM
+  AI
+  INTEGRATION
+  WORKFLOW
+}
+
+// ─── Better Auth identity ─────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions    Session[]
+  accounts    Account[]
+  memberships Membership[]
+
+  assignedOpportunities Opportunity[]  @relation("OpportunityAssignee")
+  ownedTasks            Task[]         @relation("TaskAssignee")
+  ownedAppointments     Appointment[]  @relation("AppointmentOwner")
+  createdActivities     Activity[]     @relation("ActivityActor")
+  auditLogs             AuditLog[]     @relation("AuditActor")
+  assignmentEventsFrom  AssignmentEvent[] @relation("AssignmentFrom")
+  assignmentEventsTo    AssignmentEvent[] @relation("AssignmentTo")
+  assignmentEventsBy    AssignmentEvent[] @relation("AssignmentActor")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─── Tenancy ──────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teams         Team[]
+  memberships   Membership[]
+  contacts      Contact[]
+  tags          Tag[]
+  pipelines     Pipeline[]
+  opportunities Opportunity[]
+  properties    Property[]
+  activities    Activity[]
+  tasks         Task[]
+  appointments  Appointment[]
+  workflows     Workflow[]
+  enrollments   WorkflowEnrollment[]
+  contactFacts  ContactFact[]
+  auditLogs     AuditLog[]
+  assignments   AssignmentEvent[]
+}
+
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  memberships Membership[]
+
+  @@index([organizationId])
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId         String?
+  team           Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  role           MembershipRole @default(AGENT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+// ─── People ───────────────────────────────────────────────────────────────────
+
+model Contact {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  firstName     String
+  lastName      String
+  preferredName String?
+  contactType   ContactType    @default(LEAD)
+  lifecycleStage LifecycleStage @default(NEW)
+  temperature   LeadTemperature?
+  source        String?
+  leadSource    String?
+  referrerName  String?
+  assignedAgentUserId String?
+
+  budgetMin          Decimal? @db.Decimal(14, 2)
+  budgetMax          Decimal? @db.Decimal(14, 2)
+  timeline           String?
+  motivation         String?
+  communicationPref  String?
+  doNotContact       Boolean  @default(false)
+  consentEmail       Boolean  @default(false)
+  consentSms         Boolean  @default(false)
+  consentCall        Boolean  @default(false)
+
+  preferences Json?
+  customFields Json?
+
+  lastContactedAt DateTime?
+  lastResponseAt  DateTime?
+  firstContactAt  DateTime?
+
+  notesSummary String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emails        ContactEmail[]
+  phones        ContactPhone[]
+  addresses     ContactAddress[]
+  tags          ContactTag[]
+  relationshipsFrom ContactRelationship[] @relation("RelFrom")
+  relationshipsTo   ContactRelationship[] @relation("RelTo")
+  properties    ContactProperty[]
+  opportunities Opportunity[]
+  activities    Activity[]
+  tasks         Task[]
+  appointments  Appointment[]
+  facts         ContactFact[]
+  enrollments   WorkflowEnrollment[]
+
+  @@index([organizationId])
+  @@index([organizationId, lastName, firstName])
+  @@index([organizationId, contactType])
+  @@index([organizationId, lifecycleStage])
+}
+
+model ContactEmail {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email     String
+  label     String?
+  isPrimary Boolean @default(false)
+
+  @@index([contactId])
+  @@index([email])
+}
+
+model ContactPhone {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  phone     String
+  label     String?
+  isPrimary Boolean @default(false)
+
+  @@index([contactId])
+  @@index([phone])
+}
+
+model ContactAddress {
+  id         String  @id @default(cuid())
+  contactId  String
+  contact    Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  line1      String?
+  line2      String?
+  city       String?
+  state      String?
+  postalCode String?
+  country    String? @default("US")
+  label      String?
+  isPrimary  Boolean @default(false)
+
+  @@index([contactId])
+}
+
+model ContactRelationship {
+  id               String   @id @default(cuid())
+  organizationId   String
+  fromContactId    String
+  fromContact      Contact  @relation("RelFrom", fields: [fromContactId], references: [id], onDelete: Cascade)
+  toContactId      String
+  toContact        Contact  @relation("RelTo", fields: [toContactId], references: [id], onDelete: Cascade)
+  relationshipType String
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  @@unique([fromContactId, toContactId, relationshipType])
+  @@index([organizationId])
+  @@index([toContactId])
+}
+
+model Tag {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  color          String?
+
+  contacts ContactTag[]
+
+  @@unique([organizationId, name])
+}
+
+model ContactTag {
+  contactId String
+  tagId     String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([contactId, tagId])
+}
+
+model ContactFact {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  statement      String
+  source         ContactFactSource @default(USER)
+  confidence     FactConfidence    @default(MEDIUM)
+  provenance     DataProvenance    @default(USER_ENTERED)
+  lastVerifiedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organizationId, contactId])
+}
+
+// ─── Deals / Pipeline ─────────────────────────────────────────────────────────
+
+model Pipeline {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  type           OpportunityType
+  isDefault      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  stages        PipelineStage[]
+  opportunities Opportunity[]
+
+  @@index([organizationId])
+}
+
+model PipelineStage {
+  id         String   @id @default(cuid())
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name       String
+  key        String
+  position   Int
+  isTerminal Boolean  @default(false)
+  color      String?
+
+  opportunities Opportunity[]
+
+  @@unique([pipelineId, key])
+  @@index([pipelineId, position])
+}
+
+model Opportunity {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String
+  contact        Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  pipelineId     String
+  pipeline       Pipeline        @relation(fields: [pipelineId], references: [id])
+  pipelineStageId String
+  pipelineStage  PipelineStage   @relation(fields: [pipelineStageId], references: [id])
+  propertyId     String?
+  property       Property?       @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  type        OpportunityType
+  title       String
+  source      String?
+  campaign    String?
+  temperature LeadTemperature @default(WARM)
+  leadScore   Int?
+  engagementScore Int?
+  estimatedValue Decimal? @db.Decimal(14, 2)
+  probability    Int?
+  nextAction     String?
+  nextActionAt   DateTime?
+  estimatedTimeline String?
+
+  assignedToUserId String?
+  assignedTo       User?   @relation("OpportunityAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  firstContactAt  DateTime?
+  lastContactAt   DateTime?
+  lastResponseAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities Activity[]
+  tasks      Task[]
+  enrollments WorkflowEnrollment[]
+  assignmentEvents AssignmentEvent[]
+
+  @@index([organizationId])
+  @@index([organizationId, pipelineStageId])
+  @@index([organizationId, assignedToUserId])
+  @@index([contactId])
+}
+
+// ─── Properties ───────────────────────────────────────────────────────────────
+
+model Property {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String @default("US")
+
+  propertyType String?
+  beds         Float?
+  baths        Float?
+  sqft         Int?
+  lotSizeSqft  Int?
+  yearBuilt    Int?
+
+  listPrice   Decimal? @db.Decimal(14, 2)
+  status      PropertyStatus @default(UNKNOWN)
+  mlsNumber   String?
+  description String?
+  provenance  DataProvenance @default(USER_ENTERED)
+
+  characteristics Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts      ContactProperty[]
+  opportunities Opportunity[]
+  tasks         Task[]
+  appointments  Appointment[]
+  activities    Activity[]
+
+  @@index([organizationId])
+  @@index([organizationId, city, state])
+  @@index([organizationId, postalCode])
+}
+
+model ContactProperty {
+  id         String              @id @default(cuid())
+  contactId  String
+  contact    Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  role       ContactPropertyRole @default(OTHER)
+  notes      String?
+  createdAt  DateTime            @default(now())
+
+  @@unique([contactId, propertyId, role])
+  @@index([propertyId])
+}
+
+// ─── Work & timeline ──────────────────────────────────────────────────────────
+
+model Activity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  propertyId     String?
+  property       Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actor          User?        @relation("ActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  type        ActivityType
+  subject     String?
+  body        String?
+  metadata    Json?
+  occurredAt  DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+
+  @@index([organizationId, occurredAt])
+  @@index([contactId, occurredAt])
+  @@index([opportunityId])
+}
+
+model Task {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  opportunityId  String?
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  propertyId     String?
+  property       Property?    @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  assigneeUserId String?
+  assignee       User?        @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+  status      TaskStatus   @default(OPEN)
+  priority    TaskPriority @default(MEDIUM)
+  category    String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  snoozedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status, dueAt])
+  @@index([assigneeUserId])
+  @@index([contactId])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  propertyId     String?
+  property       Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  ownerUserId    String?
+  owner          User?             @relation("AppointmentOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  status      AppointmentStatus @default(SCHEDULED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, startsAt])
+  @@index([contactId])
+}
+
+// ─── Workflow stubs ───────────────────────────────────────────────────────────
+
+model Workflow {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  status         WorkflowStatus @default(DRAFT)
+  definition     Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  enrollments WorkflowEnrollment[]
+
+  @@index([organizationId])
+}
+
+model WorkflowEnrollment {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflowId     String
+  workflow       Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  opportunityId  String?
+  opportunity    Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus @default(ACTIVE)
+  currentStepKey String?
+  enrolledAt     DateTime         @default(now())
+  exitedAt       DateTime?
+
+  @@index([organizationId, status])
+  @@index([workflowId])
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id             String      @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actorUserId    String?
+  actor          User?       @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  entityType     String
+  entityId       String
+  action         String
+  before         Json?
+  after          Json?
+  source         AuditSource @default(USER)
+  createdAt      DateTime    @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AssignmentEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunityId  String
+  opportunity    Opportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  fromUserId     String?
+  fromUser       User?        @relation("AssignmentFrom", fields: [fromUserId], references: [id], onDelete: SetNull)
+  toUserId       String?
+  toUser         User?        @relation("AssignmentTo", fields: [toUserId], references: [id], onDelete: SetNull)
+  actorUserId    String?
+  actor          User?        @relation("AssignmentActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  reason         String?
+  source         AuditSource  @default(USER)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([opportunityId])
+}

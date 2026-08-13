@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: joe-re-os-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: joe
+      POSTGRES_PASSWORD: joe
+      POSTGRES_DB: joe_real_estate_os
+    volumes:
+      - joe_re_os_pgdata:/var/lib/postgresql/data
+
+volumes:
+  joe_re_os_pgdata:
