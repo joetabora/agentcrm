@@ -52,6 +52,11 @@ import {
 import { enrollManually } from "@/domain/workflows/engine"
 import type { WorkflowDefinition } from "@/domain/workflows/definition"
 import { addNote, createNoteSchema } from "@/domain/activities/service"
+import {
+  createSavedReport,
+  createSavedReportSchema,
+  deleteSavedReport,
+} from "@/domain/reports/service"
 import { requireOrgContext, requireSession } from "@/server/session"
 
 export async function signUpAction(formData: FormData): Promise<void> {
@@ -299,6 +304,33 @@ export async function deleteSavedViewAction(formData: FormData): Promise<void> {
   const viewId = String(formData.get("viewId") ?? "")
   await deleteSavedView(ctx.organization.id, ctx.user.id, viewId)
   redirect("/app/leads")
+}
+
+export async function createSavedReportAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  let definition: unknown = { preset: "30d" }
+  try {
+    definition = JSON.parse(String(formData.get("definitionJson") ?? "{}"))
+  } catch {
+    definition = { preset: "30d" }
+  }
+  const parsed = createSavedReportSchema.safeParse({
+    name: formData.get("name"),
+    type: formData.get("type"),
+    definition,
+  })
+  if (!parsed.success) {
+    redirect("/app/reports?error=invalid_report")
+  }
+  const saved = await createSavedReport(ctx.organization.id, ctx.user.id, parsed.data)
+  redirect(`/app/reports/${saved.id}`)
+}
+
+export async function deleteSavedReportAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const reportId = String(formData.get("reportId") ?? "")
+  await deleteSavedReport(ctx.organization.id, ctx.user.id, reportId)
+  redirect("/app/reports")
 }
 
 export async function createRoutingRuleAction(formData: FormData): Promise<void> {

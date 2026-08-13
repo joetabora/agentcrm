@@ -44,11 +44,11 @@ Offers, contracts, deadlines, checklists, parties, commission fields.
 
 Authorized RESO/IDX/VOW only. No scraping. Clear data attribution.
 
-## Phase 12 — Mobile / PWA (current)
+## Phase 12 — Mobile / PWA (done)
 
 Installable PWA, offline-friendly agenda/contact basics, outbox for complete-task + add-note.
 
-## Phase 13 — Advanced analytics
+## Phase 13 — Advanced analytics (current)
 
 Reusable reporting primitives: conversion, response time, GCI, source ROI.
 

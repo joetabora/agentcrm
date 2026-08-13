@@ -195,6 +195,13 @@ enum SavedViewEntity {
   CONTACTS
 }
 
+enum ReportType {
+  CONVERSION
+  RESPONSE_TIME
+  GCI
+  SOURCE_ROI
+}
+
 enum RoutingAssignMode {
   SPECIFIC_USER
   ROUND_ROBIN
@@ -291,6 +298,7 @@ model User {
   assignmentEventsTo    AssignmentEvent[] @relation("AssignmentTo")
   assignmentEventsBy    AssignmentEvent[] @relation("AssignmentActor")
   savedViews            SavedView[]    @relation("SavedViewOwner")
+  savedReports          SavedReport[]  @relation("SavedReportOwner")
   routingRulesTarget    RoutingRule[]  @relation("RoutingRuleTarget")
   messages              Message[]      @relation("MessageActor")
   approvedCampaigns     Campaign[]     @relation("CampaignApprover")
@@ -372,6 +380,7 @@ model Organization {
   auditLogs     AuditLog[]
   assignments   AssignmentEvent[]
   savedViews    SavedView[]
+  savedReports  SavedReport[]
   routingRules  RoutingRule[]
   messageTemplates MessageTemplate[]
   communicationThreads CommunicationThread[]
@@ -1070,6 +1079,25 @@ model SavedView {
   updatedAt      DateTime        @updatedAt
 
   @@index([organizationId, entity])
+  @@index([ownerUserId])
+}
+
+// ─── Phase 13: saved report queries ───────────────────────────────────────────
+
+model SavedReport {
+  id             String     @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerUserId    String
+  owner          User       @relation("SavedReportOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name           String
+  type           ReportType
+  /// { preset, from?, to?, opportunityType?, sourceSpend? }
+  definition     Json
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([organizationId, type])
   @@index([ownerUserId])
 }
 
