@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -250,11 +251,11 @@ export function AppShell({
               <Sheet open={open} onOpenChange={setOpen}>
                 <SheetTrigger
                   render={
-                    <Button variant="outline" size="icon" className="size-9" aria-label="Open menu">
-                      <Menu className="size-4" />
-                    </Button>
+                    <Button variant="outline" size="icon" className="size-9" aria-label="Open menu" />
                   }
-                />
+                >
+                  <Menu className="size-4" />
+                </SheetTrigger>
                 <SheetContent side="left" className="w-72 bg-sidebar p-0 text-sidebar-foreground">
                   <SheetHeader className="border-b border-sidebar-border p-4 text-left">
                     <SheetTitle>Navigation</SheetTitle>
@@ -294,30 +295,31 @@ export function AppShell({
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <Button variant="outline" size="icon" className="size-9" aria-label="Quick create">
-                      <Plus className="size-4" />
-                    </Button>
+                    <Button variant="outline" size="icon" className="size-9" aria-label="Quick create" />
                   }
-                />
+                >
+                  <Plus className="size-4" />
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Create</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/app/contacts/new")}>
-                    New contact
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/leads/new")}>
-                    New lead
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/tasks")}>New task</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/properties/new")}>
-                    Add property
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/campaigns")}>
-                    Create campaign
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/assistant")}>
-                    Ask AI
-                  </DropdownMenuItem>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Create</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => router.push("/app/contacts/new")}>
+                      New contact
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/leads/new")}>
+                      New lead
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/tasks")}>New task</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/properties/new")}>
+                      Add property
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/campaigns")}>
+                      Create campaign
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/assistant")}>
+                      Ask AI
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
@@ -333,36 +335,39 @@ export function AppShell({
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
-                    <Button variant="ghost" size="icon" className="size-9" aria-label="Account menu">
-                      <Avatar size="sm">
-                        <AvatarFallback>{initials || "JR"}</AvatarFallback>
-                      </Avatar>
-                    </Button>
+                    <Button variant="ghost" size="icon" className="size-9" aria-label="Account menu" />
                   }
-                />
+                >
+                  <Avatar size="sm">
+                    <AvatarFallback>{initials || "JR"}</AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col">
-                      <span className="truncate font-medium">{userName}</span>
-                      <span className="truncate text-xs font-normal text-muted-foreground">
-                        {orgName}
-                      </span>
-                    </div>
-                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col">
+                        <span className="truncate font-medium text-foreground">{userName}</span>
+                        <span className="truncate text-xs font-normal text-muted-foreground">
+                          {orgName}
+                        </span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <ThemeToggleItem />
+                    <DropdownMenuItem onClick={() => router.push("/app/settings")}>
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/app/help")}>Help</DropdownMenuItem>
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
-                  <ThemeToggleItem />
-                  <DropdownMenuItem onClick={() => router.push("/app/settings")}>
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/app/help")}>Help</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      void signOutAction()
-                    }}
-                  >
-                    Sign out
-                  </DropdownMenuItem>
+                  <DropdownMenuGroup>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        void signOutAction()
+                      }}
+                    >
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
