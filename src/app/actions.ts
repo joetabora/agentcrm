@@ -862,3 +862,117 @@ export async function confirmAssistantActionAction(input: {
     args: input.args,
   })
 }
+
+export async function createCampaignAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createCampaign } = await import("@/domain/campaigns/service")
+
+  const channel = String(formData.get("channel") ?? "EMAIL") === "SMS" ? "SMS" : "EMAIL"
+  const waitHours = Number(formData.get("waitHours") ?? "24")
+  const sendBody = String(formData.get("sendBody") ?? "").trim()
+  const sendSubject = String(formData.get("sendSubject") ?? "").trim()
+
+  const definition = {
+    entryKey: "delay1",
+    steps: [
+      {
+        key: "delay1",
+        type: "DELAY" as const,
+        waitHours: Number.isFinite(waitHours) && waitHours > 0 ? waitHours : 24,
+        nextKey: channel === "SMS" ? "sms1" : "email1",
+      },
+      channel === "SMS"
+        ? {
+            key: "sms1",
+            type: "SEND_SMS" as const,
+            body: sendBody || "Hi {{firstName}}, checking in from {{organizationName}}.",
+            nextKey: "exit",
+          }
+        : {
+            key: "email1",
+            type: "SEND_EMAIL" as const,
+            subject: sendSubject || "Hello {{firstName}}",
+            body:
+              sendBody ||
+              "Hi {{firstName}},\n\nJust checking in from {{organizationName}}.\n\n— {{agentName}}",
+            nextKey: "exit",
+          },
+      { key: "exit", type: "EXIT" as const },
+    ],
+  }
+
+  const empty = (v: FormDataEntryValue | null) => {
+    const s = String(v ?? "").trim()
+    return s.length ? s : null
+  }
+
+  const audience = {
+    requireConsent: true as const,
+    contactType: empty(formData.get("contactType")) as
+      | "LEAD"
+      | "BUYER"
+      | "SELLER"
+      | null,
+    lifecycleStage: empty(formData.get("lifecycleStage")) as "NEW" | "NURTURE" | null,
+    temperature: empty(formData.get("temperature")) as "COLD" | "WARM" | "HOT" | null,
+    sourceContains: empty(formData.get("sourceContains")),
+    tagName: empty(formData.get("tagName")),
+  }
+
+  const campaign = await createCampaign(ctx.organization.id, ctx.user.id, {
+    name: String(formData.get("name") ?? "").trim(),
+    description: String(formData.get("description") ?? "") || null,
+    channel,
+    definition,
+    audience,
+  })
+  redirect(`/app/campaigns/${campaign.id}`)
+}
+
+export async function submitCampaignAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { submitCampaignForApproval } = await import("@/domain/campaigns/service")
+  const campaignId = String(formData.get("campaignId") ?? "")
+  await submitCampaignForApproval(ctx.organization.id, ctx.user.id, campaignId)
+  redirect(`/app/campaigns/${campaignId}`)
+}
+
+export async function approveCampaignAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  if (ctx.membership.role === "ASSISTANT") {
+    throw new Error("Assistants cannot approve campaigns")
+  }
+  const { approveCampaign } = await import("@/domain/campaigns/service")
+  const campaignId = String(formData.get("campaignId") ?? "")
+  await approveCampaign(ctx.organization.id, ctx.user.id, campaignId)
+  redirect(`/app/campaigns/${campaignId}`)
+}
+
+export async function pauseCampaignAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { pauseCampaign } = await import("@/domain/campaigns/service")
+  const campaignId = String(formData.get("campaignId") ?? "")
+  await pauseCampaign(ctx.organization.id, ctx.user.id, campaignId)
+  redirect(`/app/campaigns/${campaignId}`)
+}
+
+export async function enrollCampaignAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { enrollAudience, tickCampaignsForOrg } = await import("@/domain/campaigns/engine")
+  const campaignId = String(formData.get("campaignId") ?? "")
+  await enrollAudience({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    campaignId,
+  })
+  await tickCampaignsForOrg(ctx.organization.id)
+  redirect(`/app/campaigns/${campaignId}`)
+}
+
+export async function tickCampaignsAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { tickCampaignsForOrg } = await import("@/domain/campaigns/engine")
+  const campaignId = String(formData.get("campaignId") ?? "")
+  await tickCampaignsForOrg(ctx.organization.id)
+  redirect(campaignId ? `/app/campaigns/${campaignId}` : "/app/campaigns")
+}

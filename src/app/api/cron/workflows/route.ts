@@ -1,4 +1,5 @@
 import { processDueEnrollments } from "@/domain/workflows/engine"
+import { processDueCampaignEnrollments } from "@/domain/campaigns/engine"
 import { NextResponse } from "next/server"
 
 export const runtime = "nodejs"
@@ -15,6 +16,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const result = await processDueEnrollments()
-  return NextResponse.json({ ok: true, ...result })
+  const [workflows, campaigns] = await Promise.all([
+    processDueEnrollments(),
+    processDueCampaignEnrollments(),
+  ])
+  return NextResponse.json({ ok: true, workflows, campaigns })
 }

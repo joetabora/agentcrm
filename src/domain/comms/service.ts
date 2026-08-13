@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db"
 import { writeAuditLog } from "@/server/audit"
 import type { AuditSource, CommChannel, Prisma } from "@/generated/prisma/client"
 import { z } from "zod"
-import { assertCanSend, renderTemplate } from "@/domain/comms/consent"
+import { assertCanSend, buildMergeVars, renderTemplate } from "@/domain/comms/consent"
 import { getEmailFromAddress, getEmailProvider } from "@/providers/email"
 import { getSmsFromNumber, getSmsProvider } from "@/providers/sms"
 
@@ -100,7 +100,7 @@ export async function sendEmail(input: {
 }): Promise<SendResult> {
   const contact = await prisma.contact.findFirst({
     where: { id: input.contactId, organizationId: input.organizationId },
-    include: { emails: true },
+    include: { emails: true, organization: true, phones: true },
   })
   if (!contact) return { ok: false, error: "Contact not found" }
 
@@ -124,28 +124,28 @@ export async function sendEmail(input: {
 
   const primary = contact.emails.find((e) => e.isPrimary) ?? contact.emails[0]
   if (!primary) return { ok: false, error: "Contact has no email address" }
+  const primaryPhone = contact.phones.find((p) => p.isPrimary) ?? contact.phones[0]
 
   let subject = input.subject ?? ""
   let body = input.body ?? ""
   const templateId = input.templateId ?? null
+  const vars = buildMergeVars({
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    preferredName: contact.preferredName,
+    email: primary.email,
+    phone: primaryPhone?.phone,
+    agentName: input.agentName,
+    organizationName: contact.organization.name,
+  })
   if (templateId) {
     const tpl = await prisma.messageTemplate.findFirst({
       where: { id: templateId, organizationId: input.organizationId, channel: "EMAIL" },
     })
     if (!tpl) return { ok: false, error: "Template not found" }
-    const vars = {
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      agentName: input.agentName ?? "",
-    }
     subject = renderTemplate(tpl.subject ?? (subject || "Message"), vars)
     body = renderTemplate(tpl.body, vars)
   } else {
-    const vars = {
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      agentName: input.agentName ?? "",
-    }
     subject = renderTemplate(subject || "Message", vars)
     body = renderTemplate(body, vars)
   }
@@ -252,7 +252,7 @@ export async function sendSms(input: {
 }): Promise<SendResult> {
   const contact = await prisma.contact.findFirst({
     where: { id: input.contactId, organizationId: input.organizationId },
-    include: { phones: true },
+    include: { phones: true, emails: true, organization: true },
   })
   if (!contact) return { ok: false, error: "Contact not found" }
 
@@ -276,14 +276,19 @@ export async function sendSms(input: {
 
   const primary = contact.phones.find((p) => p.isPrimary) ?? contact.phones[0]
   if (!primary) return { ok: false, error: "Contact has no phone number" }
+  const primaryEmail = contact.emails.find((e) => e.isPrimary) ?? contact.emails[0]
 
   let body = input.body ?? ""
   const templateId = input.templateId ?? null
-  const vars = {
+  const vars = buildMergeVars({
     firstName: contact.firstName,
     lastName: contact.lastName,
-    agentName: input.agentName ?? "",
-  }
+    preferredName: contact.preferredName,
+    email: primaryEmail?.email,
+    phone: primary.phone,
+    agentName: input.agentName,
+    organizationName: contact.organization.name,
+  })
   if (templateId) {
     const tpl = await prisma.messageTemplate.findFirst({
       where: { id: templateId, organizationId: input.organizationId, channel: "SMS" },

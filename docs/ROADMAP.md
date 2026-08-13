@@ -28,11 +28,11 @@ Match engine, price/DOM signals (with provenance), buyer preference evaluation.
 
 Context-aware Q&A over authorized CRM data; facts vs inference labeling; no fabrication.
 
-## Phase 8 — AI action engine (current)
+## Phase 8 — AI action engine (done)
 
 Tool execution with permission checks, confirmation for high-risk actions, audit logs.
 
-## Phase 9 — Marketing automation
+## Phase 9 — Marketing automation (current)
 
 Campaigns, drips, merge variables, human approval before external send.
 

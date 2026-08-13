@@ -16,7 +16,7 @@ export default async function TemplatesSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Message templates"
-        description="Merge vars: {{firstName}}, {{lastName}}, {{agentName}}"
+        description="Merge vars: {{firstName}}, {{lastName}}, {{preferredName}}, {{agentName}}, {{email}}, {{phone}}, {{organizationName}}"
       />
 
       <Card>

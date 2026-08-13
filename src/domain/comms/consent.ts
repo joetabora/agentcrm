@@ -30,15 +30,27 @@ export function assertCanSend(
   return { allowed: true }
 }
 
-const MERGE_KEYS = ["firstName", "lastName", "agentName"] as const
+export const MERGE_KEYS = [
+  "firstName",
+  "lastName",
+  "preferredName",
+  "agentName",
+  "email",
+  "phone",
+  "organizationName",
+] as const
 
 export type MergeVars = {
   firstName?: string
   lastName?: string
+  preferredName?: string
   agentName?: string
+  email?: string
+  phone?: string
+  organizationName?: string
 }
 
-/** Only {{firstName}} {{lastName}} {{agentName}} — no arbitrary keys. */
+/** Allowlisted merge keys only — unknown {{keys}} left literal. */
 export function renderTemplate(body: string, vars: MergeVars): string {
   let out = body
   for (const key of MERGE_KEYS) {
@@ -46,4 +58,24 @@ export function renderTemplate(body: string, vars: MergeVars): string {
     out = out.replaceAll(`{{${key}}}`, value)
   }
   return out
+}
+
+export function buildMergeVars(input: {
+  firstName: string
+  lastName: string
+  preferredName?: string | null
+  email?: string | null
+  phone?: string | null
+  agentName?: string | null
+  organizationName?: string | null
+}): MergeVars {
+  return {
+    firstName: input.firstName,
+    lastName: input.lastName,
+    preferredName: input.preferredName ?? input.firstName,
+    email: input.email ?? "",
+    phone: input.phone ?? "",
+    agentName: input.agentName ?? "",
+    organizationName: input.organizationName ?? "",
+  }
 }

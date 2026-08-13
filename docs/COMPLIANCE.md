@@ -29,7 +29,9 @@ Only authorized feeds. Attribute source. Respect display and storage rules. Neve
 
 ## Marketing content
 
-AI-generated marketing is a **draft** until human approval for external publication (default).
+## Marketing campaigns (Phase 9)
+
+Campaigns are `DRAFT` → `PENDING_APPROVAL` → human **Approve** → `ACTIVE` before enroll/send. External drip sends reuse Phase 5 consent/DNC. Audience capped at 200 per enroll.
 
 ## Data accuracy
 
