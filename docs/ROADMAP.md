@@ -24,11 +24,11 @@ Email/SMS providers (Resend/Twilio + mocks), threads, consent/opt-out, templates
 
 Match engine, price/DOM signals (with provenance), buyer preference evaluation.
 
-## Phase 7 — AI assistant (current)
+## Phase 7 — AI assistant (done)
 
 Context-aware Q&A over authorized CRM data; facts vs inference labeling; no fabrication.
 
-## Phase 8 — AI action engine
+## Phase 8 — AI action engine (current)
 
 Tool execution with permission checks, confirmation for high-risk actions, audit logs.
 

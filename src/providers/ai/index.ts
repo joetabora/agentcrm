@@ -33,6 +33,7 @@ export class MockAIProvider implements AIProvider {
             kind: "FACT",
           },
         ],
+        proposedActions: [],
         refused: true,
         refuseReason: "Mock AI provider (OPENAI_API_KEY not set)",
       }),

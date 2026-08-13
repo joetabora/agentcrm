@@ -847,3 +847,18 @@ export async function createContactFactAction(formData: FormData): Promise<void>
     redirectTo.startsWith("/app/") ? redirectTo : `/app/contacts/${contactId}`,
   )
 }
+
+export async function confirmAssistantActionAction(input: {
+  tool: string
+  args: Record<string, unknown>
+}) {
+  const ctx = await requireOrgContext()
+  const { confirmAssistantAction } = await import("@/domain/ai/execute")
+  return confirmAssistantAction({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    role: ctx.membership.role,
+    tool: input.tool,
+    args: input.args,
+  })
+}

@@ -2,6 +2,11 @@ import { z } from "zod"
 import { writeAuditLog } from "@/server/audit"
 import { getAIProvider } from "@/providers/ai"
 import { buildCrmContext } from "@/domain/ai/context"
+import {
+  normalizeProposedAction,
+  proposedActionSchema,
+  toolCatalogForPrompt,
+} from "@/domain/ai/tools"
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@/generated/prisma/client"
 
@@ -16,6 +21,7 @@ export const assistantClaimSchema = z.object({
 export const assistantResponseSchema = z.object({
   answerMarkdown: z.string().max(20000),
   claims: z.array(assistantClaimSchema).default([]),
+  proposedActions: z.array(proposedActionSchema).default([]),
   refused: z.boolean().optional(),
   refuseReason: z.string().max(1000).optional(),
 })
@@ -24,13 +30,17 @@ export type AssistantResponse = z.infer<typeof assistantResponseSchema>
 
 const SYSTEM_PROMPT = `You are Joe Real Estate OS assistant. Answer ONLY using the CONTEXT block.
 Rules:
-- Never invent emails, phone numbers, prices, MLS data, activities, or preferences not in CONTEXT.
+- Never invent emails, phone numbers, prices, MLS data, activities, preferences, or entity ids not in CONTEXT.
 - Every claim must be labeled FACT (directly from CONTEXT fields), CALCULATION (deterministic from CONTEXT), INFERENCE (careful guess clearly not verified), or UNKNOWN.
 - If CONTEXT is insufficient, set refused=true and refuseReason, and put UNKNOWN claims only.
 - Fair Housing: do not reason about race, religion, national origin, sex, disability, familial status, or proxies for those.
 - Property answers may only use stored inventory fields from CONTEXT.
+- You may PROPOSE actions in proposedActions; never claim an action already ran. Humans must confirm before execution.
+${toolCatalogForPrompt()}
+- proposedActions[].id must be a short unique slug per response (e.g. "a1").
+- proposedActions[].risk should be "low" or "high" (server will normalize).
 - Respond with JSON only matching:
-{"answerMarkdown":"string","claims":[{"text":"string","kind":"FACT"|"CALCULATION"|"INFERENCE"|"UNKNOWN","sourceIds":["optional"]}],"refused":false,"refuseReason":"optional"}`
+{"answerMarkdown":"string","claims":[{"text":"string","kind":"FACT"|"CALCULATION"|"INFERENCE"|"UNKNOWN","sourceIds":["optional"]}],"proposedActions":[{"id":"a1","tool":"create_task","args":{},"rationale":"string","risk":"low"}],"refused":false,"refuseReason":"optional"}`
 
 export function parseAssistantResponse(raw: string): AssistantResponse {
   const trimmed = raw.trim()
@@ -38,6 +48,7 @@ export function parseAssistantResponse(raw: string): AssistantResponse {
     return {
       answerMarkdown: "No answer returned.",
       claims: [{ text: "Empty model response", kind: "UNKNOWN" }],
+      proposedActions: [],
       refused: true,
       refuseReason: "Empty model response",
     }
@@ -47,11 +58,17 @@ export function parseAssistantResponse(raw: string): AssistantResponse {
     const jsonEnd = trimmed.lastIndexOf("}")
     const slice =
       jsonStart >= 0 && jsonEnd > jsonStart ? trimmed.slice(jsonStart, jsonEnd + 1) : trimmed
-    return assistantResponseSchema.parse(JSON.parse(slice))
+    const parsed = assistantResponseSchema.parse(JSON.parse(slice))
+    return {
+      ...parsed,
+      proposedActions: parsed.proposedActions.map(normalizeProposedAction),
+    }
   } catch {
     return {
-      answerMarkdown: "Could not parse a grounded answer. Please try again or inspect CRM records directly.",
+      answerMarkdown:
+        "Could not parse a grounded answer. Please try again or inspect CRM records directly.",
       claims: [{ text: "Response failed schema validation", kind: "UNKNOWN" }],
+      proposedActions: [],
       refused: true,
       refuseReason: "Invalid model JSON",
     }
@@ -71,6 +88,7 @@ export async function askAssistant(input: {
       response: {
         answerMarkdown: "Please enter a question.",
         claims: [],
+        proposedActions: [],
         refused: true,
         refuseReason: "Empty question",
       } satisfies AssistantResponse,
@@ -93,6 +111,7 @@ export async function askAssistant(input: {
       answerMarkdown:
         "I don’t have enough CRM context in your organization to answer. Add contacts, leads, or properties first.",
       claims: [{ text: "No authorized CRM context available", kind: "UNKNOWN" }],
+      proposedActions: [],
       refused: true,
       refuseReason: "Empty context pack",
     }
@@ -107,6 +126,7 @@ export async function askAssistant(input: {
         refused: true,
         reason: "empty_context",
         sourceIds: [],
+        proposedTools: [],
       },
       source: "AI",
     })
@@ -137,6 +157,7 @@ export async function askAssistant(input: {
     const response: AssistantResponse = {
       answerMarkdown: `AI provider failed: ${message}`,
       claims: [{ text: message, kind: "UNKNOWN" }],
+      proposedActions: [],
       refused: true,
       refuseReason: message,
     }
@@ -173,6 +194,7 @@ export async function askAssistant(input: {
       refused: response.refused ?? false,
       claimKinds: response.claims.map((c) => c.kind),
       sourceIds: pack.sources.map((s) => s.id),
+      proposedTools: response.proposedActions.map((a) => a.tool),
     } as Prisma.InputJsonValue,
     source: "AI",
   })

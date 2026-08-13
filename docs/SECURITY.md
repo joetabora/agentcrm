@@ -44,6 +44,6 @@ Mutations that change assignment, status, or sensitive fields write `AuditLog` /
 
 Signed URLs, content-type allowlists, virus scanning consideration, tenant-scoped object keys.
 
-## AI actions (future)
+## AI actions (Phase 8)
 
-Permission checks + confirmation for external sends; every AI tool invocation audited.
+Propose-then-confirm only. Permission checks by `MembershipRole`; every confirm/deny audited (`AssistantAction`). External sends reuse consent gates; high-risk tools never auto-run.

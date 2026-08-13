@@ -18,7 +18,7 @@ export default async function AssistantPage({
     <div>
       <PageHeader
         title="Assistant"
-        description={`Grounded Q&A over your org CRM data. Provider: ${provider.name}. No CRM mutations from the model — save facts only when you confirm.`}
+        description={`Grounded Q&A over your org CRM data. Provider: ${provider.name}. Proposed actions never run until you confirm.`}
       />
       <AssistantForm
         contacts={contacts.map((c) => ({

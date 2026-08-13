@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
-import { askAssistantAction, createContactFactAction } from "@/app/actions"
+import {
+  askAssistantAction,
+  confirmAssistantActionAction,
+  createContactFactAction,
+} from "@/app/actions"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +21,14 @@ type Claim = {
   sourceIds?: string[]
 }
 
+type ProposedAction = {
+  id: string
+  tool: string
+  args: Record<string, unknown>
+  rationale: string
+  risk?: "low" | "high"
+}
+
 type Source = {
   type: string
   id: string
@@ -27,6 +39,7 @@ type AskResult = {
   response: {
     answerMarkdown: string
     claims: Claim[]
+    proposedActions: ProposedAction[]
     refused?: boolean
     refuseReason?: string
   }
@@ -34,6 +47,11 @@ type AskResult = {
   provider: string
   model: string
   contextEmpty: boolean
+}
+
+type ActionStatus = {
+  state: "idle" | "pending" | "ok" | "error" | "dismissed"
+  message?: string
 }
 
 function sourceHref(s: Source): string | null {
@@ -76,10 +94,12 @@ export function AssistantForm({
   const [result, setResult] = useState<AskResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const [actionStatus, setActionStatus] = useState<Record<string, ActionStatus>>({})
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setActionStatus({})
     startTransition(async () => {
       try {
         const res = await askAssistantAction({
@@ -92,6 +112,49 @@ export function AssistantForm({
       }
     })
   }
+
+  function dismissAction(id: string) {
+    setActionStatus((prev) => ({
+      ...prev,
+      [id]: { state: "dismissed", message: "Dismissed" },
+    }))
+  }
+
+  function confirmAction(action: ProposedAction) {
+    setActionStatus((prev) => ({
+      ...prev,
+      [action.id]: { state: "pending" },
+    }))
+    startTransition(async () => {
+      try {
+        const res = await confirmAssistantActionAction({
+          tool: action.tool,
+          args: action.args,
+        })
+        if (res.ok) {
+          setActionStatus((prev) => ({
+            ...prev,
+            [action.id]: { state: "ok", message: res.message },
+          }))
+        } else {
+          setActionStatus((prev) => ({
+            ...prev,
+            [action.id]: { state: "error", message: res.error },
+          }))
+        }
+      } catch (err) {
+        setActionStatus((prev) => ({
+          ...prev,
+          [action.id]: {
+            state: "error",
+            message: err instanceof Error ? err.message : "Confirm failed",
+          },
+        }))
+      }
+    })
+  }
+
+  const proposed = result?.response.proposedActions ?? []
 
   return (
     <div className="space-y-6">
@@ -125,7 +188,7 @@ export function AssistantForm({
           />
         </div>
         <Button type="submit" disabled={pending || !question.trim()}>
-          {pending ? "Asking…" : "Ask assistant"}
+          {pending ? "Working…" : "Ask assistant"}
         </Button>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
       </form>
@@ -197,6 +260,85 @@ export function AssistantForm({
             </Card>
           ) : null}
 
+          {proposed.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Proposed actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Nothing runs until you confirm. High-risk actions (email, SMS, stage, enroll)
+                  always need explicit approval.
+                </p>
+                {proposed.map((action) => {
+                  const status = actionStatus[action.id] ?? { state: "idle" as const }
+                  const done =
+                    status.state === "ok" ||
+                    status.state === "error" ||
+                    status.state === "dismissed"
+                  return (
+                    <div key={action.id} className="space-y-2 rounded-md border p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{action.tool}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={
+                            action.risk === "high"
+                              ? "border-amber-600/50 text-amber-800"
+                              : undefined
+                          }
+                        >
+                          {action.risk === "high" ? "high risk" : "low risk"}
+                        </Badge>
+                      </div>
+                      {action.rationale ? (
+                        <p className="text-sm text-muted-foreground">{action.rationale}</p>
+                      ) : null}
+                      <pre className="overflow-x-auto rounded bg-muted/50 p-2 text-xs">
+                        {JSON.stringify(action.args, null, 2)}
+                      </pre>
+                      {status.message ? (
+                        <p
+                          className={cn(
+                            "text-sm",
+                            status.state === "error"
+                              ? "text-destructive"
+                              : status.state === "ok"
+                                ? "text-emerald-700 dark:text-emerald-400"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {status.message}
+                        </p>
+                      ) : null}
+                      {!done ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={pending || status.state === "pending"}
+                            onClick={() => confirmAction(action)}
+                          >
+                            {status.state === "pending" ? "Confirming…" : "Confirm"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={pending || status.state === "pending"}
+                            onClick={() => dismissAction(action.id)}
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          ) : null}
+
           {result.sources.length > 0 ? (
             <Card>
               <CardHeader>
@@ -210,7 +352,10 @@ export function AssistantForm({
                       <li key={`${s.type}-${s.id}`} className="flex gap-2">
                         <Badge variant="outline">{s.type}</Badge>
                         {href ? (
-                          <Link href={href} className="text-primary underline-offset-2 hover:underline">
+                          <Link
+                            href={href}
+                            className="text-primary underline-offset-2 hover:underline"
+                          >
                             {s.label}
                           </Link>
                         ) : (
