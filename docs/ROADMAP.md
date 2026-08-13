@@ -8,11 +8,11 @@ Auth, org tenancy, contacts (+ detail), properties, leads/pipeline, tasks, appoi
 
 Saved views, bulk actions, routing rules UI, richer filters, assignment audit UX, pipeline stage config.
 
-## Phase 3 — Tasks + daily agenda intelligence (current)
+## Phase 3 — Tasks + daily agenda intelligence (done)
 
 Prioritization heuristics (transparent), snooze/reschedule UX, recurring tasks.
 
-## Phase 4 — Workflow automation
+## Phase 4 — Workflow automation (current)
 
 Generic engine: trigger → conditions → actions → delays → branches → enrollment.
 

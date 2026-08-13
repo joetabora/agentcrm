@@ -294,6 +294,21 @@ export async function createOpportunity(
     source: assignmentSource,
   })
 
+  const { dispatchWorkflowEvent } = await import("@/domain/workflows/engine")
+  void dispatchWorkflowEvent({
+    organizationId,
+    trigger: "OPPORTUNITY_CREATED",
+    contactId: opportunity.contactId,
+    opportunityId: opportunity.id,
+    actorUserId,
+    context: {
+      type: opportunity.type,
+      temperature: opportunity.temperature,
+      stageKey: stage.key,
+      source: opportunity.source,
+    },
+  })
+
   return opportunity
 }
 
@@ -344,6 +359,21 @@ export async function moveOpportunityStage(
     action: "STAGE_CHANGE",
     before: { stageId: opportunity.pipelineStageId },
     after: { stageId: stage.id },
+  })
+
+  const { dispatchWorkflowEvent } = await import("@/domain/workflows/engine")
+  void dispatchWorkflowEvent({
+    organizationId,
+    trigger: "STAGE_CHANGED",
+    contactId: opportunity.contactId,
+    opportunityId,
+    actorUserId,
+    context: {
+      type: updated.type,
+      temperature: updated.temperature,
+      stageKey: stage.key,
+      source: updated.source,
+    },
   })
 
   return updated

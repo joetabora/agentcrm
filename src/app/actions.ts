@@ -43,6 +43,14 @@ import {
   resolveSnoozeUntil,
   snoozeTask,
 } from "@/domain/tasks/service"
+import {
+  createWorkflow,
+  createWorkflowSchema,
+  deleteWorkflow,
+  updateWorkflowStatus,
+} from "@/domain/workflows/service"
+import { enrollManually } from "@/domain/workflows/engine"
+import type { WorkflowDefinition } from "@/domain/workflows/definition"
 import { addNote, createNoteSchema } from "@/domain/activities/service"
 import { requireOrgContext, requireSession } from "@/server/session"
 
@@ -477,4 +485,153 @@ export async function rescheduleAppointmentAction(formData: FormData): Promise<v
     endsAt,
   )
   redirect(taskRedirect(formData))
+}
+
+function parseWorkflowFilter(formData: FormData) {
+  const filter: Record<string, string> = {}
+  const type = String(formData.get("filterType") ?? "")
+  const temperature = String(formData.get("filterTemperature") ?? "")
+  const stageKey = String(formData.get("filterStageKey") ?? "").trim()
+  const sourceContains = String(formData.get("filterSourceContains") ?? "").trim()
+  if (type === "BUYER" || type === "SELLER") filter.type = type
+  if (temperature === "COLD" || temperature === "WARM" || temperature === "HOT") {
+    filter.temperature = temperature
+  }
+  if (stageKey) filter.stageKey = stageKey
+  if (sourceContains) filter.sourceContains = sourceContains
+  return filter
+}
+
+/** Build a guided linear definition from the settings form. */
+function buildGuidedWorkflowDefinition(formData: FormData): WorkflowDefinition {
+  const trigger = String(formData.get("trigger") ?? "OPPORTUNITY_CREATED")
+  const triggerFilter = parseWorkflowFilter(formData)
+  const taskTitle = String(formData.get("taskTitle") ?? "").trim() || "Workflow follow-up"
+  const taskPriority = String(formData.get("taskPriority") ?? "MEDIUM")
+  const dueInHoursRaw = String(formData.get("dueInHours") ?? "")
+  const dueInHours = dueInHoursRaw ? Number(dueInHoursRaw) : undefined
+  const waitHoursRaw = String(formData.get("waitHours") ?? "")
+  const waitHours = waitHoursRaw ? Number(waitHoursRaw) : 0
+  const noteBody = String(formData.get("noteBody") ?? "").trim()
+  const moveStageKey = String(formData.get("moveStageKey") ?? "").trim()
+  const branchTemperature = String(formData.get("branchTemperature") ?? "")
+
+  const steps: WorkflowDefinition["steps"] = []
+
+  if (branchTemperature === "HOT" || branchTemperature === "WARM" || branchTemperature === "COLD") {
+    steps.push({
+      key: "branch_temp",
+      type: "BRANCH",
+      conditions: { temperature: branchTemperature },
+      nextKey: "create_task",
+      elseKey: "exit",
+    })
+  }
+
+  steps.push({
+    key: "create_task",
+    type: "ACTION_CREATE_TASK",
+    title: taskTitle,
+    priority:
+      taskPriority === "LOW" ||
+      taskPriority === "HIGH" ||
+      taskPriority === "URGENT" ||
+      taskPriority === "MEDIUM"
+        ? taskPriority
+        : "MEDIUM",
+    dueInHours: dueInHours != null && !Number.isNaN(dueInHours) ? dueInHours : undefined,
+    nextKey: noteBody
+      ? "add_note"
+      : moveStageKey
+        ? "move_stage"
+        : waitHours > 0
+          ? "delay"
+          : "exit",
+  })
+
+  if (noteBody) {
+    steps.push({
+      key: "add_note",
+      type: "ACTION_ADD_NOTE",
+      body: noteBody,
+      nextKey: moveStageKey ? "move_stage" : waitHours > 0 ? "delay" : "exit",
+    })
+  }
+
+  if (moveStageKey) {
+    steps.push({
+      key: "move_stage",
+      type: "ACTION_MOVE_STAGE",
+      stageKey: moveStageKey,
+      nextKey: waitHours > 0 ? "delay" : "exit",
+    })
+  }
+
+  if (waitHours > 0) {
+    steps.push({
+      key: "delay",
+      type: "DELAY",
+      waitHours,
+      nextKey: "exit",
+    })
+  }
+
+  steps.push({ key: "exit", type: "EXIT" })
+
+  return {
+    trigger: trigger as WorkflowDefinition["trigger"],
+    triggerFilter,
+    steps,
+  }
+}
+
+export async function createWorkflowAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const definition = buildGuidedWorkflowDefinition(formData)
+  const parsed = createWorkflowSchema.safeParse({
+    name: formData.get("name"),
+    description: formData.get("description") || null,
+    status: formData.get("status") || "DRAFT",
+    definition,
+  })
+  if (!parsed.success) {
+    redirect("/app/settings/workflows?error=invalid")
+  }
+  await createWorkflow(ctx.organization.id, parsed.data)
+  redirect("/app/settings/workflows")
+}
+
+export async function setWorkflowStatusAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const workflowId = String(formData.get("workflowId") ?? "")
+  const status = String(formData.get("status") ?? "") as
+    | "DRAFT"
+    | "ACTIVE"
+    | "PAUSED"
+    | "ARCHIVED"
+  await updateWorkflowStatus(ctx.organization.id, workflowId, status)
+  redirect("/app/settings/workflows")
+}
+
+export async function deleteWorkflowAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const workflowId = String(formData.get("workflowId") ?? "")
+  await deleteWorkflow(ctx.organization.id, workflowId)
+  redirect("/app/settings/workflows")
+}
+
+export async function enrollWorkflowAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const workflowId = String(formData.get("workflowId") ?? "")
+  const opportunityId = String(formData.get("opportunityId") ?? "") || null
+  const contactId = String(formData.get("contactId") ?? "") || null
+  const redirectTo = String(formData.get("redirectTo") ?? "/app")
+  await enrollManually({
+    organizationId: ctx.organization.id,
+    workflowId,
+    opportunityId,
+    contactId,
+    actorUserId: ctx.user.id,
+  })
+  redirect(redirectTo.startsWith("/app") ? redirectTo : "/app")
 }

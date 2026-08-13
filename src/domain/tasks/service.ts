@@ -443,6 +443,15 @@ export async function completeTask(
     })
   }
 
+  const { dispatchWorkflowEvent } = await import("@/domain/workflows/engine")
+  void dispatchWorkflowEvent({
+    organizationId,
+    trigger: "TASK_COMPLETED",
+    contactId: task.contactId,
+    opportunityId: task.opportunityId,
+    actorUserId,
+  })
+
   return { task: updated, nextTask }
 }
 

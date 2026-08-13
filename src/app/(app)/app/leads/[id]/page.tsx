@@ -2,12 +2,14 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import {
+  enrollWorkflowAction,
   moveStageAction,
   reassignOpportunityAction,
   setTemperatureAction,
 } from "@/app/actions"
 import { getOpportunity } from "@/domain/opportunities/service"
 import { listOrgMembers } from "@/domain/orgs/members"
+import { listActiveWorkflowsForManual } from "@/domain/workflows/service"
 import { requireOrgContext } from "@/server/session"
 import { TemperatureBadge } from "@/components/crm/shared"
 import { Badge } from "@/components/ui/badge"
@@ -21,9 +23,10 @@ export default async function LeadDetailPage({
 }) {
   const ctx = await requireOrgContext()
   const { id } = await params
-  const [opportunity, members] = await Promise.all([
+  const [opportunity, members, manualWorkflows] = await Promise.all([
     getOpportunity(ctx.organization.id, id),
     listOrgMembers(ctx.organization.id),
+    listActiveWorkflowsForManual(ctx.organization.id),
   ])
   if (!opportunity) notFound()
 
@@ -130,6 +133,31 @@ export default async function LeadDetailPage({
                 Reassign
               </Button>
             </form>
+
+            {manualWorkflows.length > 0 ? (
+              <form action={enrollWorkflowAction} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="opportunityId" value={opportunity.id} />
+                <input type="hidden" name="contactId" value={opportunity.contactId} />
+                <input type="hidden" name="redirectTo" value={`/app/leads/${opportunity.id}`} />
+                <label className="space-y-1 text-sm">
+                  <span className="text-muted-foreground">Enroll in workflow</span>
+                  <select
+                    name="workflowId"
+                    required
+                    className="block h-8 rounded-md border bg-background px-2"
+                  >
+                    {manualWorkflows.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <Button type="submit" size="sm" variant="outline">
+                  Enroll
+                </Button>
+              </form>
+            ) : null}
           </CardContent>
         </Card>
 

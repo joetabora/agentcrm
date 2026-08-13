@@ -726,10 +726,13 @@ model WorkflowEnrollment {
   opportunity    Opportunity?     @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   status         EnrollmentStatus @default(ACTIVE)
   currentStepKey String?
+  nextRunAt      DateTime?
+  lastError      String?
   enrolledAt     DateTime         @default(now())
   exitedAt       DateTime?
 
   @@index([organizationId, status])
+  @@index([organizationId, status, nextRunAt])
   @@index([workflowId])
 }
 

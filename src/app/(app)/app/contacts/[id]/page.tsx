@@ -1,8 +1,9 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
-import { addNoteAction } from "@/app/actions"
+import { addNoteAction, enrollWorkflowAction } from "@/app/actions"
 import { getContact } from "@/domain/contacts/service"
+import { listActiveWorkflowsForManual } from "@/domain/workflows/service"
 import { requireOrgContext } from "@/server/session"
 import { EmptyState, TemperatureBadge } from "@/components/crm/shared"
 import { Badge } from "@/components/ui/badge"
@@ -16,7 +17,10 @@ export default async function ContactDetailPage({
 }) {
   const ctx = await requireOrgContext()
   const { id } = await params
-  const contact = await getContact(ctx.organization.id, id)
+  const [contact, manualWorkflows] = await Promise.all([
+    getContact(ctx.organization.id, id),
+    listActiveWorkflowsForManual(ctx.organization.id),
+  ])
   if (!contact) notFound()
 
   const email = contact.emails.find((e) => e.isPrimary)?.email ?? contact.emails[0]?.email
@@ -55,6 +59,26 @@ export default async function ContactDetailPage({
           >
             Add task
           </Link>
+          {manualWorkflows.length > 0 ? (
+            <form action={enrollWorkflowAction} className="inline-flex h-8 items-center gap-1">
+              <input type="hidden" name="contactId" value={contact.id} />
+              <input type="hidden" name="redirectTo" value={`/app/contacts/${contact.id}`} />
+              <select
+                name="workflowId"
+                required
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+              >
+                {manualWorkflows.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" size="sm" variant="outline">
+                Enroll
+              </Button>
+            </form>
+          ) : null}
         </div>
       </div>
 

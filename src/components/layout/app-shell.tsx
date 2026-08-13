@@ -13,6 +13,7 @@ import {
   Route,
   Search,
   Users,
+  Workflow,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ const nav = [
   { href: "/app/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/app/search", label: "Search", icon: Search },
   { href: "/app/settings/routing", label: "Routing", icon: Route },
+  { href: "/app/settings/workflows", label: "Workflows", icon: Workflow },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

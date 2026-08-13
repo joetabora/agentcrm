@@ -206,4 +206,54 @@ describe("tenant isolation + core domain", () => {
     expect(done?.nextTask?.recurrenceRule).toBe("WEEKLY")
     expect(done?.nextTask?.recurrenceParentId).toBe(taskA.id)
   })
+
+  it("workflow enrollments stay tenant-scoped and dedupe ACTIVE", async () => {
+    const { createWorkflow } = await import("@/domain/workflows/service")
+    const { enrollManually } = await import("@/domain/workflows/engine")
+
+    const wf = await createWorkflow(orgAId, {
+      name: `Manual WF ${suffix}`,
+      status: "ACTIVE",
+      definition: {
+        trigger: "MANUAL",
+        triggerFilter: {},
+        steps: [
+          {
+            key: "note",
+            type: "ACTION_ADD_NOTE",
+            body: "Enrolled",
+            nextKey: "exit",
+          },
+          { key: "exit", type: "EXIT" },
+        ],
+      },
+    })
+
+    const first = await enrollManually({
+      organizationId: orgAId,
+      workflowId: wf.id,
+      contactId: contactAId,
+      actorUserId: userAId,
+    })
+    expect(first.organizationId).toBe(orgAId)
+
+    await expect(
+      enrollManually({
+        organizationId: orgBId,
+        workflowId: wf.id,
+        contactId: contactAId,
+        actorUserId: userBId,
+      }),
+    ).rejects.toThrow()
+
+    // After complete, re-enroll allowed; while still active would dedupe —
+    // first enrollment already completed via EXIT, so second enroll creates new
+    const second = await enrollManually({
+      organizationId: orgAId,
+      workflowId: wf.id,
+      contactId: contactAId,
+      actorUserId: userAId,
+    })
+    expect(second.id).not.toBe(first.id)
+  })
 })
