@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import { createOrganizationForUser } from "@/domain/orgs/service"
 import { createContact, getContact, listContacts } from "@/domain/contacts/service"
 import {
+  bulkUpdateOpportunities,
   createOpportunity,
   listOpportunities,
   moveOpportunityStage,
@@ -152,5 +153,30 @@ describe("tenant isolation + core domain", () => {
     const resultsB = await globalSearch(orgBId, `TenantA${suffix}`)
     expect(resultsA.some((r) => r.id === contactAId)).toBe(true)
     expect(resultsB.some((r) => r.id === contactAId)).toBe(false)
+  })
+
+  it("bulk updates only opportunities in the actor org", async () => {
+    const oppA = await createOpportunity(orgAId, userAId, {
+      contactId: contactAId,
+      type: "BUYER",
+      title: `Bulk A ${suffix}`,
+      temperature: "COLD",
+    })
+    const oppB = await createOpportunity(orgBId, userBId, {
+      contactId: contactBId,
+      type: "BUYER",
+      title: `Bulk B ${suffix}`,
+      temperature: "COLD",
+    })
+
+    const result = await bulkUpdateOpportunities(orgAId, userAId, [oppA.id, oppB.id], {
+      temperature: "HOT",
+    })
+    expect(result.count).toBe(1)
+
+    const refreshedA = await prisma.opportunity.findUniqueOrThrow({ where: { id: oppA.id } })
+    const refreshedB = await prisma.opportunity.findUniqueOrThrow({ where: { id: oppB.id } })
+    expect(refreshedA.temperature).toBe("HOT")
+    expect(refreshedB.temperature).toBe("COLD")
   })
 })

@@ -11,10 +11,23 @@ import {
 } from "@/domain/contacts/service"
 import {
   assignOpportunity,
+  bulkUpdateOpportunities,
   createOpportunity,
   createOpportunitySchema,
   moveOpportunityStage,
+  setOpportunityTemperature,
 } from "@/domain/opportunities/service"
+import {
+  createSavedView,
+  createSavedViewSchema,
+  deleteSavedView,
+} from "@/domain/saved-views/service"
+import {
+  createRoutingRule,
+  createRoutingRuleSchema,
+  deleteRoutingRule,
+  updateRoutingRule,
+} from "@/domain/routing/service"
 import { createProperty, createPropertySchema } from "@/domain/properties/service"
 import {
   completeTask,
@@ -186,8 +199,142 @@ export async function moveStageAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgContext()
   const opportunityId = String(formData.get("opportunityId") ?? "")
   const pipelineStageId = String(formData.get("pipelineStageId") ?? "")
+  const redirectTo = String(formData.get("redirectTo") ?? "/app/pipeline")
   await moveOpportunityStage(ctx.organization.id, ctx.user.id, opportunityId, pipelineStageId)
-  redirect("/app/pipeline")
+  redirect(redirectTo.startsWith("/app/") ? redirectTo : "/app/pipeline")
+}
+
+export async function setTemperatureAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const opportunityId = String(formData.get("opportunityId") ?? "")
+  const temperature = String(formData.get("temperature") ?? "") as "COLD" | "WARM" | "HOT"
+  await setOpportunityTemperature(ctx.organization.id, ctx.user.id, opportunityId, temperature)
+  redirect(`/app/leads/${opportunityId}`)
+}
+
+export async function reassignOpportunityAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const opportunityId = String(formData.get("opportunityId") ?? "")
+  const toUserId = String(formData.get("toUserId") ?? ctx.user.id)
+  const reason = String(formData.get("reason") ?? "") || undefined
+  const redirectTo = String(formData.get("redirectTo") ?? "/app/leads")
+  await assignOpportunity(ctx.organization.id, ctx.user.id, opportunityId, toUserId, reason)
+  redirect(redirectTo.startsWith("/app/") ? redirectTo : "/app/leads")
+}
+
+export async function bulkUpdateOpportunitiesAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const opportunityIds = formData.getAll("opportunityIds").map(String)
+  const pipelineStageId = String(formData.get("pipelineStageId") ?? "") || undefined
+  const temperatureRaw = String(formData.get("temperature") ?? "")
+  const assignToUserId = String(formData.get("assignToUserId") ?? "") || undefined
+  const temperature =
+    temperatureRaw === "COLD" || temperatureRaw === "WARM" || temperatureRaw === "HOT"
+      ? temperatureRaw
+      : undefined
+
+  await bulkUpdateOpportunities(ctx.organization.id, ctx.user.id, opportunityIds, {
+    pipelineStageId,
+    temperature,
+    assignToUserId,
+  })
+}
+
+export async function createSavedViewAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  let filters: Record<string, unknown> = {}
+  try {
+    filters = JSON.parse(String(formData.get("filtersJson") ?? "{}")) as Record<string, unknown>
+  } catch {
+    filters = {}
+  }
+  const parsed = createSavedViewSchema.safeParse({
+    name: formData.get("name"),
+    entity: formData.get("entity") || "LEADS",
+    filters,
+    isShared: formData.get("isShared") === "1",
+  })
+  if (!parsed.success) {
+    redirect("/app/leads?error=invalid_view")
+  }
+  await createSavedView(ctx.organization.id, ctx.user.id, parsed.data)
+  redirect("/app/leads")
+}
+
+export async function deleteSavedViewAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const viewId = String(formData.get("viewId") ?? "")
+  await deleteSavedView(ctx.organization.id, ctx.user.id, viewId)
+  redirect("/app/leads")
+}
+
+export async function createRoutingRuleAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const conditions: Record<string, unknown> = {}
+  const type = String(formData.get("type") ?? "")
+  const temperature = String(formData.get("temperature") ?? "")
+  const sourceContains = String(formData.get("sourceContains") ?? "").trim()
+  const minEstimatedValue = formData.get("minEstimatedValue")
+    ? Number(formData.get("minEstimatedValue"))
+    : undefined
+  const maxEstimatedValue = formData.get("maxEstimatedValue")
+    ? Number(formData.get("maxEstimatedValue"))
+    : undefined
+  if (type === "BUYER" || type === "SELLER") conditions.type = type
+  if (temperature === "COLD" || temperature === "WARM" || temperature === "HOT") {
+    conditions.temperature = temperature
+  }
+  if (sourceContains) conditions.sourceContains = sourceContains
+  if (minEstimatedValue != null && !Number.isNaN(minEstimatedValue)) {
+    conditions.minEstimatedValue = minEstimatedValue
+  }
+  if (maxEstimatedValue != null && !Number.isNaN(maxEstimatedValue)) {
+    conditions.maxEstimatedValue = maxEstimatedValue
+  }
+
+  const parsed = createRoutingRuleSchema.safeParse({
+    name: formData.get("name"),
+    position: Number(formData.get("position") ?? 0),
+    assignMode: formData.get("assignMode") || "SPECIFIC_USER",
+    targetUserId: formData.get("targetUserId") || null,
+    conditions,
+    enabled: true,
+  })
+  if (!parsed.success) {
+    redirect("/app/settings/routing?error=invalid_rule")
+  }
+  await createRoutingRule(ctx.organization.id, parsed.data)
+  redirect("/app/settings/routing")
+}
+
+export async function toggleRoutingRuleAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const ruleId = String(formData.get("ruleId") ?? "")
+  const enabled = formData.get("enabled") === "1"
+  await updateRoutingRule(ctx.organization.id, ruleId, { enabled })
+  redirect("/app/settings/routing")
+}
+
+export async function deleteRoutingRuleAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const ruleId = String(formData.get("ruleId") ?? "")
+  await deleteRoutingRule(ctx.organization.id, ruleId)
+  redirect("/app/settings/routing")
+}
+
+export async function updatePipelineStageAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { updatePipelineStage } = await import("@/domain/opportunities/service")
+  const stageId = String(formData.get("stageId") ?? "")
+  const name = String(formData.get("name") ?? "").trim()
+  const positionRaw = formData.get("position")
+  const position = positionRaw != null && String(positionRaw) !== "" ? Number(positionRaw) : undefined
+  await updatePipelineStage(ctx.organization.id, stageId, {
+    name: name || undefined,
+    position: position != null && !Number.isNaN(position) ? position : undefined,
+  })
+  const type = String(formData.get("pipelineType") ?? "BUYER")
+  redirect(`/app/pipeline?type=${type === "SELLER" ? "SELLER" : "BUYER"}&configure=1`)
 }
 
 export async function createPropertyAction(formData: FormData): Promise<void> {
@@ -257,12 +404,4 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
   }
   await createAppointment(ctx.organization.id, ctx.user.id, parsed.data)
   redirect("/app/tasks")
-}
-
-export async function reassignOpportunityAction(formData: FormData): Promise<void> {
-  const ctx = await requireOrgContext()
-  const opportunityId = String(formData.get("opportunityId") ?? "")
-  const toUserId = String(formData.get("toUserId") ?? ctx.user.id)
-  await assignOpportunity(ctx.organization.id, ctx.user.id, opportunityId, toUserId)
-  redirect("/app/leads")
 }

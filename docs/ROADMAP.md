@@ -1,12 +1,12 @@
 # Roadmap — Joe Real Estate OS
 
-## Phase 1 — CRM foundation (current)
+## Phase 1 — CRM foundation (done)
 
-Auth, org tenancy, contacts (+ detail), properties, leads/pipeline, tasks, appointments, activity timeline, dashboard, search, seed, tests.
+Auth, org tenancy, contacts (+ detail), properties, leads/pipeline, tasks, appointments, activity timeline, dashboard, search, seed, tests. Deployed to Vercel + Supabase.
 
-## Phase 2 — Lead management + pipeline polish
+## Phase 2 — Lead management + pipeline polish (current)
 
-Saved views, bulk actions, routing rules UI, richer filters, assignment audit UX.
+Saved views, bulk actions, routing rules UI, richer filters, assignment audit UX, pipeline stage config.
 
 ## Phase 3 — Tasks + daily agenda intelligence
 

@@ -166,6 +166,16 @@ enum AuditSource {
   WORKFLOW
 }
 
+enum SavedViewEntity {
+  LEADS
+  CONTACTS
+}
+
+enum RoutingAssignMode {
+  SPECIFIC_USER
+  ROUND_ROBIN
+}
+
 // ─── Better Auth identity ─────────────────────────────────────────────────────
 
 model User {
@@ -189,6 +199,8 @@ model User {
   assignmentEventsFrom  AssignmentEvent[] @relation("AssignmentFrom")
   assignmentEventsTo    AssignmentEvent[] @relation("AssignmentTo")
   assignmentEventsBy    AssignmentEvent[] @relation("AssignmentActor")
+  savedViews            SavedView[]    @relation("SavedViewOwner")
+  routingRulesTarget    RoutingRule[]  @relation("RoutingRuleTarget")
 
   @@map("user")
 }
@@ -264,6 +276,8 @@ model Organization {
   contactFacts  ContactFact[]
   auditLogs     AuditLog[]
   assignments   AssignmentEvent[]
+  savedViews    SavedView[]
+  routingRules  RoutingRule[]
 }
 
 model Team {
@@ -744,4 +758,44 @@ model AssignmentEvent {
 
   @@index([organizationId, createdAt])
   @@index([opportunityId])
+}
+
+// ─── Phase 2: saved views + routing ───────────────────────────────────────────
+
+model SavedView {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerUserId    String
+  owner          User            @relation("SavedViewOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name           String
+  entity         SavedViewEntity @default(LEADS)
+  filters        Json
+  isShared       Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organizationId, entity])
+  @@index([ownerUserId])
+}
+
+model RoutingRule {
+  id               String            @id @default(cuid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  enabled          Boolean           @default(true)
+  position         Int               @default(0)
+  /// Match conditions: { type?, sourceContains?, temperature?, minEstimatedValue?, maxEstimatedValue? }
+  conditions       Json
+  assignMode       RoutingAssignMode @default(SPECIFIC_USER)
+  targetUserId     String?
+  targetUser       User?             @relation("RoutingRuleTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  /// User ids eligible for round-robin (empty = all AGENT+ members)
+  roundRobinUserIds Json?
+  roundRobinIndex  Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([organizationId, enabled, position])
 }

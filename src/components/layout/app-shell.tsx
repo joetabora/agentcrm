@@ -10,6 +10,7 @@ import {
   Kanban,
   LayoutDashboard,
   Menu,
+  Route,
   Search,
   Users,
 } from "lucide-react"
@@ -27,6 +28,7 @@ const nav = [
   { href: "/app/properties", label: "Properties", icon: Building2 },
   { href: "/app/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/app/search", label: "Search", icon: Search },
+  { href: "/app/settings/routing", label: "Routing", icon: Route },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
