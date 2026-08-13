@@ -42,9 +42,12 @@ export const createContactSchema = z.object({
   phone: z.string().max(40).optional().nullable(),
   notesSummary: z.string().max(5000).optional().nullable(),
   doNotContact: z.boolean().optional(),
+  consentEmail: z.boolean().optional(),
+  consentSms: z.boolean().optional(),
+  consentCall: z.boolean().optional(),
 })
 
-export type CreateContactInput = z.infer<typeof createContactSchema>
+export type CreateContactInput = z.input<typeof createContactSchema>
 
 export async function listContacts(
   organizationId: string,
@@ -139,6 +142,9 @@ export async function createContact(
       source: data.source ?? null,
       notesSummary: data.notesSummary ?? null,
       doNotContact: data.doNotContact ?? false,
+      consentEmail: data.consentEmail ?? false,
+      consentSms: data.consentSms ?? false,
+      consentCall: data.consentCall ?? false,
       firstContactAt: new Date(),
       emails: data.email
         ? { create: [{ email: data.email.toLowerCase(), isPrimary: true, label: "primary" }] }
@@ -199,6 +205,9 @@ export async function updateContact(
       source: input.source === undefined ? undefined : input.source,
       notesSummary: input.notesSummary === undefined ? undefined : input.notesSummary,
       doNotContact: input.doNotContact,
+      consentEmail: input.consentEmail,
+      consentSms: input.consentSms,
+      consentCall: input.consentCall,
     },
   })
 
@@ -212,11 +221,19 @@ export async function updateContact(
       firstName: existing.firstName,
       lastName: existing.lastName,
       lifecycleStage: existing.lifecycleStage,
+      doNotContact: existing.doNotContact,
+      consentEmail: existing.consentEmail,
+      consentSms: existing.consentSms,
+      consentCall: existing.consentCall,
     },
     after: {
       firstName: contact.firstName,
       lastName: contact.lastName,
       lifecycleStage: contact.lifecycleStage,
+      doNotContact: contact.doNotContact,
+      consentEmail: contact.consentEmail,
+      consentSms: contact.consentSms,
+      consentCall: contact.consentCall,
     },
   })
 

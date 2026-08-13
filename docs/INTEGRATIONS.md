@@ -29,8 +29,9 @@ Each package exports:
 |-------------|--------------|-------------|--------|
 | PostgreSQL | 1 | `DATABASE_URL` | Required locally (Docker) |
 | Better Auth secret | 1 | `BETTER_AUTH_SECRET` | Required |
-| Resend / SendGrid / Gmail | 5 | API keys / OAuth | Adapter stub |
-| Twilio SMS / Voice | 5 | Account SID, auth, numbers | Adapter stub |
+| Resend email | 5 | `RESEND_API_KEY`, `EMAIL_FROM` | Live adapter + mock fallback |
+| Twilio SMS | 5 | Account SID, auth, from number | Live adapter + mock fallback; STOP webhook |
+| Twilio Voice | 5 | — | Mock only (thin) |
 | Google / Microsoft Calendar | 5+ | OAuth | Deferred |
 | OpenAI / Anthropic | 7–8 | API keys | Adapter stub |
 | S3 / Supabase Storage | 10 docs | Keys / bucket | Adapter stub |

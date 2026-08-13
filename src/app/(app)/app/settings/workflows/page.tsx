@@ -156,6 +156,22 @@ export default async function WorkflowsSettingsPage() {
               <Input id="moveStageKey" name="moveStageKey" placeholder="CONTACTED" />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="sendEmailSubject">Optional send email subject</Label>
+              <Input id="sendEmailSubject" name="sendEmailSubject" placeholder="Following up" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="sendEmailBody">Optional send email body</Label>
+              <Input
+                id="sendEmailBody"
+                name="sendEmailBody"
+                placeholder="Hi {{firstName}}, …"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="sendSmsBody">Optional send SMS body</Label>
+              <Input id="sendSmsBody" name="sendSmsBody" placeholder="Hi {{firstName}}, …" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="waitHours">Optional delay hours (before exit)</Label>
               <Input id="waitHours" name="waitHours" type="number" placeholder="0" />
             </div>

@@ -256,4 +256,43 @@ describe("tenant isolation + core domain", () => {
     })
     expect(second.id).not.toBe(first.id)
   })
+
+  it("message templates and mock sends stay tenant-scoped", async () => {
+    const { createTemplate, listTemplates, sendEmail } = await import("@/domain/comms/service")
+
+    await prisma.contact.update({
+      where: { id: contactAId },
+      data: { consentEmail: true, doNotContact: false },
+    })
+
+    const tpl = await createTemplate(orgAId, {
+      channel: "EMAIL",
+      name: `Intro ${suffix}`,
+      subject: "Hi {{firstName}}",
+      body: "Hello {{firstName}} from {{agentName}}",
+    })
+    const listB = await listTemplates(orgBId)
+    expect(listB.some((t) => t.id === tpl.id)).toBe(false)
+
+    const sent = await sendEmail({
+      organizationId: orgAId,
+      actorUserId: userAId,
+      contactId: contactAId,
+      templateId: tpl.id,
+      agentName: "Agent A",
+    })
+    expect(sent.ok).toBe(true)
+    if (sent.ok && !sent.skipped) {
+      expect(sent.provider).toBe("mock")
+    }
+
+    const blocked = await sendEmail({
+      organizationId: orgBId,
+      actorUserId: userBId,
+      contactId: contactAId,
+      body: "cross tenant",
+      subject: "nope",
+    })
+    expect(blocked.ok).toBe(false)
+  })
 })

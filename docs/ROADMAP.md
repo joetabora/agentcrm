@@ -12,11 +12,11 @@ Saved views, bulk actions, routing rules UI, richer filters, assignment audit UX
 
 Prioritization heuristics (transparent), snooze/reschedule UX, recurring tasks.
 
-## Phase 4 — Workflow automation (current)
+## Phase 4 — Workflow automation (done)
 
 Generic engine: trigger → conditions → actions → delays → branches → enrollment.
 
-## Phase 5 — Communication integrations
+## Phase 5 — Communication integrations (current)
 
 Email/SMS/voice providers (real credentials), threads, consent/opt-out enforcement, templates.
 

@@ -183,6 +183,24 @@ enum RoutingAssignMode {
   ROUND_ROBIN
 }
 
+enum CommChannel {
+  EMAIL
+  SMS
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  FAILED
+  RECEIVED
+  SKIPPED
+}
+
 // ─── Better Auth identity ─────────────────────────────────────────────────────
 
 model User {
@@ -208,6 +226,7 @@ model User {
   assignmentEventsBy    AssignmentEvent[] @relation("AssignmentActor")
   savedViews            SavedView[]    @relation("SavedViewOwner")
   routingRulesTarget    RoutingRule[]  @relation("RoutingRuleTarget")
+  messages              Message[]      @relation("MessageActor")
 
   @@map("user")
 }
@@ -285,6 +304,8 @@ model Organization {
   assignments   AssignmentEvent[]
   savedViews    SavedView[]
   routingRules  RoutingRule[]
+  messageTemplates MessageTemplate[]
+  communicationThreads CommunicationThread[]
 }
 
 model Team {
@@ -369,6 +390,7 @@ model Contact {
   appointments  Appointment[]
   facts         ContactFact[]
   enrollments   WorkflowEnrollment[]
+  communicationThreads CommunicationThread[]
 
   @@index([organizationId])
   @@index([organizationId, lastName, firstName])
@@ -814,4 +836,63 @@ model RoutingRule {
   updatedAt        DateTime          @updatedAt
 
   @@index([organizationId, enabled, position])
+}
+
+// ─── Phase 5: communications ─────────────────────────────────────────────────
+
+model MessageTemplate {
+  id             String      @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel        CommChannel
+  name           String
+  subject        String?
+  body           String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  messages Message[]
+
+  @@index([organizationId, channel])
+}
+
+model CommunicationThread {
+  id               String      @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId        String
+  contact          Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel          CommChannel
+  subject          String?
+  externalThreadId String?
+  lastMessageAt    DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  messages Message[]
+
+  @@index([organizationId, contactId])
+  @@index([contactId, channel])
+}
+
+model Message {
+  id                String               @id @default(cuid())
+  organizationId    String
+  threadId          String
+  thread            CommunicationThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  direction         MessageDirection
+  status            MessageStatus        @default(PENDING)
+  subject           String?
+  body              String
+  providerMessageId String?
+  providerName      String?
+  actorUserId       String?
+  actor             User?                @relation("MessageActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  templateId        String?
+  template          MessageTemplate?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([threadId, createdAt])
 }

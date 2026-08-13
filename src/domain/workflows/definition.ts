@@ -58,6 +58,19 @@ export const workflowStepSchema = z.discriminatedUnion("type", [
     nextKey: z.string().optional().nullable(),
   }),
   baseStep.extend({
+    type: z.literal("ACTION_SEND_EMAIL"),
+    subject: z.string().max(300).optional().nullable(),
+    body: z.string().max(10000).optional().nullable(),
+    templateId: z.string().optional().nullable(),
+    nextKey: z.string().optional().nullable(),
+  }),
+  baseStep.extend({
+    type: z.literal("ACTION_SEND_SMS"),
+    body: z.string().max(1600).optional().nullable(),
+    templateId: z.string().optional().nullable(),
+    nextKey: z.string().optional().nullable(),
+  }),
+  baseStep.extend({
     type: z.literal("DELAY"),
     waitHours: z.number().int().positive().max(24 * 365),
     nextKey: z.string().min(1),

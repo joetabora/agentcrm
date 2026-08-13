@@ -1,27 +1,41 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
-import { addNoteAction, enrollWorkflowAction } from "@/app/actions"
+import { addNoteAction, enrollWorkflowAction, sendEmailAction, sendSmsAction, updateConsentAction } from "@/app/actions"
 import { getContact } from "@/domain/contacts/service"
+import { listTemplates, listThreadsForContact } from "@/domain/comms/service"
 import { listActiveWorkflowsForManual } from "@/domain/workflows/service"
+import { getEmailProvider } from "@/providers/email"
+import { getSmsProvider } from "@/providers/sms"
 import { requireOrgContext } from "@/server/session"
 import { EmptyState, TemperatureBadge } from "@/components/crm/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 export default async function ContactDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ error?: string }>
 }) {
   const ctx = await requireOrgContext()
   const { id } = await params
-  const [contact, manualWorkflows] = await Promise.all([
+  const sp = await searchParams
+  const [contact, manualWorkflows, templates, threads] = await Promise.all([
     getContact(ctx.organization.id, id),
     listActiveWorkflowsForManual(ctx.organization.id),
+    listTemplates(ctx.organization.id),
+    listThreadsForContact(ctx.organization.id, id).catch(() => []),
   ])
   if (!contact) notFound()
+
+  const emailProvider = getEmailProvider().name
+  const smsProvider = getSmsProvider().name
+  const emailTemplates = templates.filter((t) => t.channel === "EMAIL")
+  const smsTemplates = templates.filter((t) => t.channel === "SMS")
 
   const email = contact.emails.find((e) => e.isPrimary)?.email ?? contact.emails[0]?.email
   const phone = contact.phones.find((p) => p.isPrimary)?.phone ?? contact.phones[0]?.phone
@@ -84,6 +98,112 @@ export default async function ContactDetailPage({
 
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="space-y-4">
+          {sp.error ? (
+            <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {sp.error}
+            </p>
+          ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Send message</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 lg:grid-cols-2">
+              <form action={sendEmailAction} className="space-y-2 rounded-lg border p-3">
+                <input type="hidden" name="contactId" value={contact.id} />
+                <p className="text-xs text-muted-foreground">
+                  Email via <strong>{emailProvider}</strong>
+                  {!contact.consentEmail || contact.doNotContact
+                    ? " · blocked until consent/DNC allows"
+                    : ""}
+                </p>
+                <select
+                  name="templateId"
+                  className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                  defaultValue=""
+                >
+                  <option value="">No template</option>
+                  {emailTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <Input name="subject" placeholder="Subject" defaultValue="" />
+                <textarea
+                  name="body"
+                  rows={4}
+                  placeholder="Hi {{firstName}}…"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <Button type="submit" size="sm" disabled={!email}>
+                  Send email
+                </Button>
+              </form>
+
+              <form action={sendSmsAction} className="space-y-2 rounded-lg border p-3">
+                <input type="hidden" name="contactId" value={contact.id} />
+                <p className="text-xs text-muted-foreground">
+                  SMS via <strong>{smsProvider}</strong>
+                  {!contact.consentSms || contact.doNotContact
+                    ? " · blocked until consent/DNC allows"
+                    : ""}
+                </p>
+                <select
+                  name="templateId"
+                  className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                  defaultValue=""
+                >
+                  <option value="">No template</option>
+                  {smsTemplates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  name="body"
+                  rows={4}
+                  placeholder="Hi {{firstName}}, …"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
+                <Button type="submit" size="sm" disabled={!phone}>
+                  Send SMS
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {threads.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Message threads</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {threads.map((th) => (
+                  <div key={th.id} className="rounded-md border p-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
+                      {th.channel}
+                      {th.subject ? ` · ${th.subject}` : ""}
+                    </p>
+                    <ul className="space-y-2">
+                      {th.messages.map((m) => (
+                        <li key={m.id} className="text-sm">
+                          <span className="text-xs text-muted-foreground">
+                            {m.direction} · {m.status} · {format(m.createdAt, "MMM d h:mm a")}
+                            {m.providerName ? ` · ${m.providerName}` : ""}
+                          </span>
+                          {m.subject ? <p className="font-medium">{m.subject}</p> : null}
+                          <p className="whitespace-pre-wrap text-muted-foreground">{m.body}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Timeline</CardTitle>
@@ -191,18 +311,42 @@ export default async function ContactDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Details</CardTitle>
+              <CardTitle className="text-base">Consent &amp; DNC</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                <span className="text-muted-foreground">Do not contact:</span>{" "}
-                {contact.doNotContact ? "Yes" : "No"}
+            <CardContent className="space-y-3 text-sm">
+              <p className="text-xs text-muted-foreground">
+                Hard-blocks outbound email/SMS when DNC is on or channel consent is off.
               </p>
-              <p>
-                <span className="text-muted-foreground">Consent email/SMS/call:</span>{" "}
-                {contact.consentEmail ? "E" : "—"}/{contact.consentSms ? "S" : "—"}/
-                {contact.consentCall ? "C" : "—"}
-              </p>
+              <form action={updateConsentAction} className="space-y-2">
+                <input type="hidden" name="contactId" value={contact.id} />
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="doNotContact"
+                    defaultChecked={contact.doNotContact}
+                  />
+                  Do not contact
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    name="consentEmail"
+                    defaultChecked={contact.consentEmail}
+                  />
+                  Consent email
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" name="consentSms" defaultChecked={contact.consentSms} />
+                  Consent SMS
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" name="consentCall" defaultChecked={contact.consentCall} />
+                  Consent call
+                </label>
+                <Button type="submit" size="sm" variant="outline">
+                  Save consent
+                </Button>
+              </form>
               {contact.notesSummary ? (
                 <p className="whitespace-pre-wrap text-muted-foreground">{contact.notesSummary}</p>
               ) : null}

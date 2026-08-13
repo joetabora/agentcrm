@@ -454,6 +454,59 @@ async function executeStep(input: {
       return { kind: "continue", nextKey: step.nextKey ?? null }
     }
 
+    case "ACTION_SEND_EMAIL": {
+      const contactId =
+        enrollment.contactId ??
+        (
+          await prisma.opportunity.findFirst({
+            where: { id: enrollment.opportunityId ?? "", organizationId: orgId },
+            select: { contactId: true },
+          })
+        )?.contactId
+      if (!contactId) throw new Error("SEND_EMAIL requires contact")
+      const { sendEmail } = await import("@/domain/comms/service")
+      const result = await sendEmail({
+        organizationId: orgId,
+        actorUserId,
+        contactId,
+        subject: step.subject,
+        body: step.body,
+        templateId: step.templateId,
+        source: "WORKFLOW",
+        skipOnBlock: true,
+      })
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      return { kind: "continue", nextKey: step.nextKey ?? null }
+    }
+
+    case "ACTION_SEND_SMS": {
+      const contactId =
+        enrollment.contactId ??
+        (
+          await prisma.opportunity.findFirst({
+            where: { id: enrollment.opportunityId ?? "", organizationId: orgId },
+            select: { contactId: true },
+          })
+        )?.contactId
+      if (!contactId) throw new Error("SEND_SMS requires contact")
+      const { sendSms } = await import("@/domain/comms/service")
+      const result = await sendSms({
+        organizationId: orgId,
+        actorUserId,
+        contactId,
+        body: step.body,
+        templateId: step.templateId,
+        source: "WORKFLOW",
+        skipOnBlock: true,
+      })
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      return { kind: "continue", nextKey: step.nextKey ?? null }
+    }
+
     default:
       throw new Error("Unknown step type")
   }

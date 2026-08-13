@@ -6,6 +6,7 @@ import {
   Building2,
   CheckSquare,
   Contact,
+  FileText,
   Home,
   Kanban,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const nav = [
   { href: "/app/search", label: "Search", icon: Search },
   { href: "/app/settings/routing", label: "Routing", icon: Route },
   { href: "/app/settings/workflows", label: "Workflows", icon: Workflow },
+  { href: "/app/settings/templates", label: "Templates", icon: FileText },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

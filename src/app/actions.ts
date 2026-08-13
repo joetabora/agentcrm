@@ -515,8 +515,39 @@ function buildGuidedWorkflowDefinition(formData: FormData): WorkflowDefinition {
   const noteBody = String(formData.get("noteBody") ?? "").trim()
   const moveStageKey = String(formData.get("moveStageKey") ?? "").trim()
   const branchTemperature = String(formData.get("branchTemperature") ?? "")
+  const sendEmailBody = String(formData.get("sendEmailBody") ?? "").trim()
+  const sendEmailSubject = String(formData.get("sendEmailSubject") ?? "").trim()
+  const sendSmsBody = String(formData.get("sendSmsBody") ?? "").trim()
 
   const steps: WorkflowDefinition["steps"] = []
+
+  const afterTaskNext = (): string => {
+    if (noteBody) return "add_note"
+    if (moveStageKey) return "move_stage"
+    if (sendEmailBody || sendEmailSubject) return "send_email"
+    if (sendSmsBody) return "send_sms"
+    if (waitHours > 0) return "delay"
+    return "exit"
+  }
+  const afterNoteNext = (): string => {
+    if (moveStageKey) return "move_stage"
+    if (sendEmailBody || sendEmailSubject) return "send_email"
+    if (sendSmsBody) return "send_sms"
+    if (waitHours > 0) return "delay"
+    return "exit"
+  }
+  const afterStageNext = (): string => {
+    if (sendEmailBody || sendEmailSubject) return "send_email"
+    if (sendSmsBody) return "send_sms"
+    if (waitHours > 0) return "delay"
+    return "exit"
+  }
+  const afterEmailNext = (): string => {
+    if (sendSmsBody) return "send_sms"
+    if (waitHours > 0) return "delay"
+    return "exit"
+  }
+  const afterSmsNext = (): string => (waitHours > 0 ? "delay" : "exit")
 
   if (branchTemperature === "HOT" || branchTemperature === "WARM" || branchTemperature === "COLD") {
     steps.push({
@@ -540,13 +571,7 @@ function buildGuidedWorkflowDefinition(formData: FormData): WorkflowDefinition {
         ? taskPriority
         : "MEDIUM",
     dueInHours: dueInHours != null && !Number.isNaN(dueInHours) ? dueInHours : undefined,
-    nextKey: noteBody
-      ? "add_note"
-      : moveStageKey
-        ? "move_stage"
-        : waitHours > 0
-          ? "delay"
-          : "exit",
+    nextKey: afterTaskNext(),
   })
 
   if (noteBody) {
@@ -554,7 +579,7 @@ function buildGuidedWorkflowDefinition(formData: FormData): WorkflowDefinition {
       key: "add_note",
       type: "ACTION_ADD_NOTE",
       body: noteBody,
-      nextKey: moveStageKey ? "move_stage" : waitHours > 0 ? "delay" : "exit",
+      nextKey: afterNoteNext(),
     })
   }
 
@@ -563,7 +588,26 @@ function buildGuidedWorkflowDefinition(formData: FormData): WorkflowDefinition {
       key: "move_stage",
       type: "ACTION_MOVE_STAGE",
       stageKey: moveStageKey,
-      nextKey: waitHours > 0 ? "delay" : "exit",
+      nextKey: afterStageNext(),
+    })
+  }
+
+  if (sendEmailBody || sendEmailSubject) {
+    steps.push({
+      key: "send_email",
+      type: "ACTION_SEND_EMAIL",
+      subject: sendEmailSubject || "Follow-up",
+      body: sendEmailBody || "Hello {{firstName}}, following up.",
+      nextKey: afterEmailNext(),
+    })
+  }
+
+  if (sendSmsBody) {
+    steps.push({
+      key: "send_sms",
+      type: "ACTION_SEND_SMS",
+      body: sendSmsBody,
+      nextKey: afterSmsNext(),
     })
   }
 
@@ -634,4 +678,77 @@ export async function enrollWorkflowAction(formData: FormData): Promise<void> {
     actorUserId: ctx.user.id,
   })
   redirect(redirectTo.startsWith("/app") ? redirectTo : "/app")
+}
+
+export async function createTemplateAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createTemplate, createTemplateSchema } = await import("@/domain/comms/service")
+  const parsed = createTemplateSchema.safeParse({
+    channel: formData.get("channel"),
+    name: formData.get("name"),
+    subject: formData.get("subject") || null,
+    body: formData.get("body"),
+  })
+  if (!parsed.success) redirect("/app/settings/templates?error=invalid")
+  await createTemplate(ctx.organization.id, parsed.data)
+  redirect("/app/settings/templates")
+}
+
+export async function deleteTemplateAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { deleteTemplate } = await import("@/domain/comms/service")
+  await deleteTemplate(ctx.organization.id, String(formData.get("templateId") ?? ""))
+  redirect("/app/settings/templates")
+}
+
+export async function sendEmailAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { sendEmail } = await import("@/domain/comms/service")
+  const contactId = String(formData.get("contactId") ?? "")
+  const result = await sendEmail({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    contactId,
+    subject: String(formData.get("subject") ?? "") || null,
+    body: String(formData.get("body") ?? "") || null,
+    templateId: String(formData.get("templateId") ?? "") || null,
+    agentName: ctx.user.name,
+    source: "USER",
+  })
+  if (!result.ok) {
+    redirect(`/app/contacts/${contactId}?error=${encodeURIComponent(result.error)}`)
+  }
+  redirect(`/app/contacts/${contactId}`)
+}
+
+export async function sendSmsAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { sendSms } = await import("@/domain/comms/service")
+  const contactId = String(formData.get("contactId") ?? "")
+  const result = await sendSms({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    contactId,
+    body: String(formData.get("body") ?? "") || null,
+    templateId: String(formData.get("templateId") ?? "") || null,
+    agentName: ctx.user.name,
+    source: "USER",
+  })
+  if (!result.ok) {
+    redirect(`/app/contacts/${contactId}?error=${encodeURIComponent(result.error)}`)
+  }
+  redirect(`/app/contacts/${contactId}`)
+}
+
+export async function updateConsentAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { updateContactConsent } = await import("@/domain/comms/service")
+  const contactId = String(formData.get("contactId") ?? "")
+  await updateContactConsent(ctx.organization.id, ctx.user.id, contactId, {
+    doNotContact: formData.get("doNotContact") === "on" || formData.get("doNotContact") === "true",
+    consentEmail: formData.get("consentEmail") === "on" || formData.get("consentEmail") === "true",
+    consentSms: formData.get("consentSms") === "on" || formData.get("consentSms") === "true",
+    consentCall: formData.get("consentCall") === "on" || formData.get("consentCall") === "true",
+  })
+  redirect(`/app/contacts/${contactId}`)
 }
