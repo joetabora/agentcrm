@@ -1,16 +1,9 @@
 import Link from "next/link"
 import { listContacts } from "@/domain/contacts/service"
 import { requireOrgContext } from "@/server/session"
-import { EmptyState, PageHeader, TemperatureBadge } from "@/components/crm/shared"
-import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { PageHeader } from "@/components/crm/shared"
+import { ContactsListOffline } from "@/components/pwa/contacts-list-offline"
+import type { StashedContactListItem } from "@/lib/offline/types"
 
 export default async function ContactsPage({
   searchParams,
@@ -24,6 +17,17 @@ export default async function ContactsPage({
     contactType: params.type as never,
   })
 
+  const stashed: StashedContactListItem[] = contacts.map((c) => ({
+    id: c.id,
+    firstName: c.firstName,
+    lastName: c.lastName,
+    contactType: c.contactType,
+    lifecycleStage: c.lifecycleStage,
+    temperature: c.temperature,
+    email: c.emails.find((e) => e.isPrimary)?.email ?? c.emails[0]?.email ?? null,
+    phone: c.phones.find((p) => p.isPrimary)?.phone ?? c.phones[0]?.phone ?? null,
+  }))
+
   return (
     <div>
       <PageHeader
@@ -32,72 +36,14 @@ export default async function ContactsPage({
         actions={
           <Link
             href="/app/contacts/new"
-            className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-primary-foreground"
+            className="inline-flex h-10 items-center rounded-lg bg-primary px-3 text-sm text-primary-foreground md:h-8"
           >
             New contact
           </Link>
         }
       />
 
-      <form className="mb-4 flex flex-wrap gap-2">
-        <input
-          name="q"
-          defaultValue={params.q}
-          placeholder="Search name, email, phone"
-          className="h-8 min-w-[220px] flex-1 rounded-lg border bg-background px-3 text-sm"
-        />
-        <button type="submit" className="h-8 rounded-lg border px-3 text-sm">
-          Search
-        </button>
-      </form>
-
-      {contacts.length === 0 ? (
-        <EmptyState
-          title="No contacts yet"
-          description="Add your first contact to start building relationship history."
-          actionHref="/app/contacts/new"
-          actionLabel="Add contact"
-        />
-      ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Temp</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>
-                    <Link href={`/app/contacts/${c.id}`} className="font-medium hover:underline">
-                      {c.firstName} {c.lastName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{c.contactType}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{c.lifecycleStage}</TableCell>
-                  <TableCell>
-                    <TemperatureBadge value={c.temperature} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.emails.find((e) => e.isPrimary)?.email ?? c.emails[0]?.email ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.phones.find((p) => p.isPrimary)?.phone ?? c.phones[0]?.phone ?? "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <ContactsListOffline contacts={stashed} searchQ={params.q} />
     </div>
   )
 }

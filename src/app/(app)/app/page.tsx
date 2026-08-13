@@ -4,6 +4,7 @@ import { getDashboardData } from "@/domain/dashboard/service"
 import { requireOrgContext } from "@/server/session"
 import { EmptyState, PageHeader, TemperatureBadge } from "@/components/crm/shared"
 import { TaskActionBar } from "@/components/crm/task-action-bar"
+import { AgendaOfflineSection } from "@/components/pwa/agenda-offline-section"
 import {
   cancelAppointmentAction,
   completeAppointmentAction,
@@ -11,10 +12,23 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import type { StashedAgendaItem } from "@/lib/offline/types"
 
 export default async function DashboardPage() {
   const ctx = await requireOrgContext()
   const data = await getDashboardData(ctx.organization.id, ctx.user.id)
+
+  const agendaItems: StashedAgendaItem[] = data.rankedAgenda.map((item) => ({
+    kind: item.kind,
+    id: item.id,
+    title: item.title,
+    score: item.score,
+    reasons: item.reasons,
+    dueAt: item.dueAt ? item.dueAt.toISOString() : null,
+    contactId: item.contactId,
+    opportunityId: item.opportunityId,
+    priority: item.priority,
+  }))
 
   return (
     <div>
@@ -61,66 +75,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-wide uppercase">Today&apos;s agenda</h2>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Do this next</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.rankedAgenda.length === 0 ? (
-                <EmptyState
-                  title="Agenda clear"
-                  description="Create a task or set a lead next action."
-                  actionHref="/app/tasks"
-                  actionLabel="Open tasks"
-                />
-              ) : (
-                data.rankedAgenda.map((item) => (
-                  <div key={`${item.kind}-${item.id}`} className="rounded-md border p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{item.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.reasons.join(" · ")}
-                          <span className="ml-2 tabular-nums">score {item.score}</span>
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          {item.kind === "follow_up" ? (
-                            <Badge variant="outline">Follow-up</Badge>
-                          ) : (
-                            <Badge variant="outline">{item.priority}</Badge>
-                          )}
-                          {item.dueAt ? <span>Due {format(item.dueAt, "MMM d, h:mm a")}</span> : null}
-                          {item.contactId ? (
-                            <Link
-                              href={`/app/contacts/${item.contactId}`}
-                              className="hover:underline"
-                            >
-                              Contact
-                            </Link>
-                          ) : null}
-                          {item.opportunityId ? (
-                            <Link
-                              href={`/app/leads/${item.opportunityId}`}
-                              className="hover:underline"
-                            >
-                              Lead
-                            </Link>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                    {item.kind === "task" ? (
-                      <div className="mt-2">
-                        <TaskActionBar taskId={item.id} redirectTo="/app" compact />
-                      </div>
-                    ) : null}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+        <div className="space-y-3">
+          <AgendaOfflineSection items={agendaItems} />
 
           <Card>
             <CardHeader>
@@ -187,7 +143,7 @@ export default async function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </section>
+        </div>
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wide uppercase">Attention required</h2>

@@ -190,6 +190,24 @@ export async function addNoteAction(formData: FormData): Promise<void> {
   redirect(`/app/contacts/${parsed.data.contactId}`)
 }
 
+export async function syncAddNoteAction(input: {
+  contactId: string
+  body: string
+  subject?: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await requireOrgContext()
+    const parsed = createNoteSchema.safeParse(input)
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid note" }
+    }
+    await addNote(ctx.organization.id, ctx.user.id, parsed.data)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to add note" }
+  }
+}
+
 export async function createOpportunityAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgContext()
   const parsed = createOpportunitySchema.safeParse({
@@ -408,6 +426,20 @@ export async function completeTaskAction(formData: FormData): Promise<void> {
   const taskId = String(formData.get("taskId") ?? "")
   await completeTask(ctx.organization.id, ctx.user.id, taskId)
   redirect(taskRedirect(formData))
+}
+
+export async function syncCompleteTaskAction(
+  taskId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const ctx = await requireOrgContext()
+    if (!taskId) return { ok: false, error: "Missing task id" }
+    const updated = await completeTask(ctx.organization.id, ctx.user.id, taskId)
+    if (!updated) return { ok: false, error: "Task not found" }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to complete task" }
+  }
 }
 
 export async function snoozeTaskAction(formData: FormData): Promise<void> {

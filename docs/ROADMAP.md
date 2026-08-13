@@ -40,13 +40,13 @@ Campaigns, drips, merge variables, human approval before external send.
 
 Offers, contracts, deadlines, checklists, parties, commission fields.
 
-## Phase 11 — MLS / IDX (current)
+## Phase 11 — MLS / IDX (done)
 
 Authorized RESO/IDX/VOW only. No scraping. Clear data attribution.
 
-## Phase 12 — Mobile / PWA
+## Phase 12 — Mobile / PWA (current)
 
-Installable PWA, offline-friendly agenda/contact basics.
+Installable PWA, offline-friendly agenda/contact basics, outbox for complete-task + add-note.
 
 ## Phase 13 — Advanced analytics
 

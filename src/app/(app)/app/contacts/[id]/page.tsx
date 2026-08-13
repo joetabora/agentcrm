@@ -2,7 +2,6 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import {
-  addNoteAction,
   enrollWorkflowAction,
   saveBuyerInterestAction,
   sendEmailAction,
@@ -19,11 +18,14 @@ import { getEmailProvider } from "@/providers/email"
 import { getSmsProvider } from "@/providers/sms"
 import { requireOrgContext } from "@/server/session"
 import { EmptyState, TemperatureBadge } from "@/components/crm/shared"
+import { ContactDetailOfflineBridge } from "@/components/pwa/contact-detail-offline-bridge"
+import { ContactNoteForm } from "@/components/pwa/contact-note-form"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import type { StashedContactDetail } from "@/lib/offline/types"
 
 export default async function ContactDetailPage({
   params,
@@ -55,7 +57,28 @@ export default async function ContactDetailPage({
   const email = contact.emails.find((e) => e.isPrimary)?.email ?? contact.emails[0]?.email
   const phone = contact.phones.find((p) => p.isPrimary)?.phone ?? contact.phones[0]?.phone
 
+  const stashedDetail: StashedContactDetail = {
+    id: contact.id,
+    firstName: contact.firstName,
+    lastName: contact.lastName,
+    contactType: contact.contactType,
+    lifecycleStage: contact.lifecycleStage,
+    temperature: contact.temperature,
+    source: contact.source,
+    email: email ?? null,
+    phone: phone ?? null,
+    notesSummary: contact.notesSummary,
+    activities: contact.activities.slice(0, 40).map((a) => ({
+      id: a.id,
+      type: a.type,
+      subject: a.subject,
+      body: a.body,
+      occurredAt: a.occurredAt.toISOString(),
+    })),
+  }
+
   return (
+    <ContactDetailOfflineBridge detail={stashedDetail}>
     <div className="space-y-4">
       <div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
@@ -351,19 +374,7 @@ export default async function ContactDetailPage({
               <CardTitle className="text-base">Timeline</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form action={addNoteAction} className="space-y-2 rounded-lg border p-3">
-                <input type="hidden" name="contactId" value={contact.id} />
-                <textarea
-                  name="body"
-                  required
-                  rows={3}
-                  placeholder="Add a note…"
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-                <Button type="submit" size="sm">
-                  Save note
-                </Button>
-              </form>
+              <ContactNoteForm contactId={contact.id} />
 
               {contact.activities.length === 0 ? (
                 <EmptyState
@@ -600,5 +611,6 @@ export default async function ContactDetailPage({
         </aside>
       </div>
     </div>
+    </ContactDetailOfflineBridge>
   )
 }

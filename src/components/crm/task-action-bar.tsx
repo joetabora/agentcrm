@@ -1,6 +1,8 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { toast } from "sonner"
 import {
   cancelTaskAction,
   completeTaskAction,
@@ -9,6 +11,7 @@ import {
 } from "@/app/actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { enqueueCompleteTask, useOnline } from "@/lib/offline/hooks"
 
 export function TaskActionBar({
   taskId,
@@ -19,24 +22,52 @@ export function TaskActionBar({
   redirectTo?: string
   compact?: boolean
 }) {
+  const online = useOnline()
+  const router = useRouter()
   const [showCustomSnooze, setShowCustomSnooze] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
+  const [queuing, setQueuing] = useState(false)
+
+  async function onCompleteOffline() {
+    setQueuing(true)
+    try {
+      await enqueueCompleteTask(taskId)
+      toast.success("Queued — will sync when online")
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not queue")
+    } finally {
+      setQueuing(false)
+    }
+  }
 
   return (
     <div className={`flex flex-wrap items-center gap-1 ${compact ? "justify-end" : ""}`}>
-      <form action={completeTaskAction}>
-        <input type="hidden" name="taskId" value={taskId} />
-        <input type="hidden" name="redirectTo" value={redirectTo} />
-        <Button type="submit" size="sm" variant="outline">
-          Done
+      {online ? (
+        <form action={completeTaskAction}>
+          <input type="hidden" name="taskId" value={taskId} />
+          <input type="hidden" name="redirectTo" value={redirectTo} />
+          <Button type="submit" size="sm" variant="outline">
+            Done
+          </Button>
+        </form>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={queuing}
+          onClick={() => void onCompleteOffline()}
+        >
+          {queuing ? "Queuing…" : "Done (queue)"}
         </Button>
-      </form>
+      )}
 
       <form action={snoozeTaskAction} className="inline-flex gap-1">
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
         <input type="hidden" name="preset" value="1h" />
-        <Button type="submit" size="sm" variant="ghost">
+        <Button type="submit" size="sm" variant="ghost" disabled={!online}>
           1h
         </Button>
       </form>
@@ -44,7 +75,7 @@ export function TaskActionBar({
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
         <input type="hidden" name="preset" value="tomorrow" />
-        <Button type="submit" size="sm" variant="ghost">
+        <Button type="submit" size="sm" variant="ghost" disabled={!online}>
           Tomorrow
         </Button>
       </form>
@@ -52,7 +83,7 @@ export function TaskActionBar({
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
         <input type="hidden" name="preset" value="3d" />
-        <Button type="submit" size="sm" variant="ghost">
+        <Button type="submit" size="sm" variant="ghost" disabled={!online}>
           +3d
         </Button>
       </form>
@@ -60,7 +91,7 @@ export function TaskActionBar({
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
         <input type="hidden" name="preset" value="next_week" />
-        <Button type="submit" size="sm" variant="ghost">
+        <Button type="submit" size="sm" variant="ghost" disabled={!online}>
           Next week
         </Button>
       </form>
@@ -69,6 +100,7 @@ export function TaskActionBar({
         type="button"
         size="sm"
         variant="ghost"
+        disabled={!online}
         onClick={() => {
           setShowCustomSnooze((v) => !v)
           setShowReschedule(false)
@@ -80,6 +112,7 @@ export function TaskActionBar({
         type="button"
         size="sm"
         variant="ghost"
+        disabled={!online}
         onClick={() => {
           setShowReschedule((v) => !v)
           setShowCustomSnooze(false)
@@ -90,7 +123,7 @@ export function TaskActionBar({
       <form action={cancelTaskAction}>
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
-        <Button type="submit" size="sm" variant="ghost">
+        <Button type="submit" size="sm" variant="ghost" disabled={!online}>
           Cancel
         </Button>
       </form>

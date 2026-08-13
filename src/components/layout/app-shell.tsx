@@ -25,6 +25,10 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { signOutAction } from "@/app/actions"
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
+import { OfflineBanner } from "@/components/pwa/offline-banner"
+import { OfflineSyncBootstrap } from "@/components/pwa/offline-sync-bootstrap"
+import { SyncQueueIndicator } from "@/components/pwa/sync-queue-indicator"
 
 const nav = [
   { href: "/app", label: "Dashboard", icon: LayoutDashboard },
@@ -57,7 +61,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -85,6 +89,8 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <OfflineSyncBootstrap />
+      <OfflineBanner />
       <div className="flex min-h-screen">
         <aside className="hidden w-60 shrink-0 border-r bg-card md:flex md:flex-col">
           <div className="flex items-center gap-2 border-b px-4 py-4">
@@ -108,32 +114,36 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b px-4 py-3 md:hidden">
-            <div className="flex items-center gap-2">
-              <Home className="size-5" />
-              <span className="text-sm font-semibold">Joe RE OS</span>
+          <header className="flex items-center justify-between gap-2 border-b px-4 py-3 md:hidden">
+            <div className="flex min-w-0 items-center gap-2">
+              <Home className="size-5 shrink-0" />
+              <span className="truncate text-sm font-semibold">Joe RE OS</span>
             </div>
-            <Sheet open={open} onOpenChange={setOpen}>
-              <SheetTrigger
-                render={
-                  <Button variant="outline" size="icon">
-                    <Menu className="size-4" />
-                  </Button>
-                }
-              />
-              <SheetContent side="left" className="w-72 p-0">
-                <SheetHeader className="border-b p-4 text-left">
-                  <SheetTitle>Navigation</SheetTitle>
-                </SheetHeader>
-                <div className="p-3">
-                  <NavLinks onNavigate={() => setOpen(false)} />
-                </div>
-              </SheetContent>
-            </Sheet>
+            <div className="flex items-center gap-2">
+              <SyncQueueIndicator />
+              <Sheet open={open} onOpenChange={setOpen}>
+                <SheetTrigger
+                  render={
+                    <Button variant="outline" size="icon" className="size-10">
+                      <Menu className="size-4" />
+                    </Button>
+                  }
+                />
+                <SheetContent side="left" className="w-72 p-0">
+                  <SheetHeader className="border-b p-4 text-left">
+                    <SheetTitle>Navigation</SheetTitle>
+                  </SheetHeader>
+                  <div className="p-3">
+                    <NavLinks onNavigate={() => setOpen(false)} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </header>
-          <main className="flex-1 p-4 md:p-6">{children}</main>
+          <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">{children}</main>
         </div>
       </div>
+      <MobileBottomNav />
     </div>
   )
 }
