@@ -2,11 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CheckSquare, Contact, Home } from "lucide-react"
+import { CalendarDays, CheckSquare, Contact, Home, Inbox } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const tabs = [
   { href: "/app", label: "Home", icon: Home, match: (p: string) => p === "/app" },
+  {
+    href: "/app/inbox",
+    label: "Inbox",
+    icon: Inbox,
+    match: (p: string) => p.startsWith("/app/inbox"),
+  },
   {
     href: "/app/contacts",
     label: "Contacts",
@@ -18,6 +24,12 @@ const tabs = [
     label: "Tasks",
     icon: CheckSquare,
     match: (p: string) => p.startsWith("/app/tasks"),
+  },
+  {
+    href: "/app/calendar",
+    label: "Calendar",
+    icon: CalendarDays,
+    match: (p: string) => p.startsWith("/app/calendar"),
   },
 ] as const
 
@@ -38,7 +50,7 @@ export function MobileBottomNav() {
               <Link
                 href={tab.href}
                 className={cn(
-                  "flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
+                  "flex flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
                   active ? "text-foreground" : "text-muted-foreground",
                 )}
               >

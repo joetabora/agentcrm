@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { listContacts } from "@/domain/contacts/service"
 import { requireOrgContext } from "@/server/session"
-import { PageHeader } from "@/components/crm/shared"
+import { PageShell } from "@/components/patterns"
 import { ContactsListOffline } from "@/components/pwa/contacts-list-offline"
+import { buttonVariants } from "@/components/ui/button"
 import type { StashedContactListItem } from "@/lib/offline/types"
+import { cn } from "@/lib/utils"
 
 export default async function ContactsPage({
   searchParams,
@@ -29,21 +31,16 @@ export default async function ContactsPage({
   }))
 
   return (
-    <div>
-      <PageHeader
-        title="Contacts"
-        description="People in your CRM"
-        actions={
-          <Link
-            href="/app/contacts/new"
-            className="inline-flex h-10 items-center rounded-lg bg-primary px-3 text-sm text-primary-foreground md:h-8"
-          >
-            New contact
-          </Link>
-        }
-      />
-
+    <PageShell
+      title="Contacts"
+      description="People in your CRM"
+      actions={
+        <Link href="/app/contacts/new" className={cn(buttonVariants({ size: "sm" }))}>
+          New contact
+        </Link>
+      }
+    >
       <ContactsListOffline contacts={stashed} searchQ={params.q} />
-    </div>
+    </PageShell>
   )
 }

@@ -1,6 +1,6 @@
 /**
  * Development seed data for Joe Real Estate OS.
- * All seeded people/properties are labeled with [SEED] where user-visible.
+ * Seed records are marked with tag "SEED" and @seed.local emails — no inline [SEED] name prefixes.
  * Never run against production.
  */
 import "dotenv/config"
@@ -25,6 +25,29 @@ const STAGES = [
   { key: "PAST_CLIENT", name: "Past Client", position: 8 },
   { key: "NURTURE", name: "Nurture", position: 9 },
   { key: "LOST", name: "Lost", position: 10, isTerminal: true },
+]
+
+const FIRST = [
+  "Sarah","James","Emily","Marcus","Olivia","Daniel","Ava","Noah","Sophia","Liam",
+  "Mia","Ethan","Isabella","Lucas","Charlotte","Henry","Amelia","Benjamin","Harper","Alexander",
+  "Grace","Jack","Ella","Owen","Chloe","Caleb","Layla","Nathan","Zoey","Isaac",
+  "Nora","Leo","Hazel","Adrian","Violet","Julian","Aurora","Aaron","Stella","Miles",
+  "Lucy","Ezra","Paisley","Roman","Ellie","Colton","Naomi","Hunter","Ivy","Parker",
+  "Willow","Declan","Bella","Kai","Maya","Ryder","Claire","Silas","Penelope","Theo",
+]
+const LAST = [
+  "Nguyen","Patel","Brooks","Lee","Garcia","Kim","Johnson","Williams","Martinez","Anderson",
+  "Thomas","Moore","Taylor","Jackson","White","Harris","Clark","Lewis","Robinson","Walker",
+  "Young","Allen","King","Wright","Scott","Torres","Nguyen","Hill","Flores","Green",
+  "Adams","Nelson","Baker","Hall","Rivera","Campbell","Mitchell","Carter","Roberts","Gomez",
+  "Phillips","Evans","Turner","Diaz","Parker","Cruz","Edwards","Collins","Reyes","Stewart",
+  "Morris","Morales","Murphy","Cook","Rogers","Gutierrez","Ortiz","Morgan","Cooper","Peterson",
+]
+
+const CITIES = [
+  "Wauwatosa","Milwaukee","Brookfield","Shorewood","Whitefish Bay",
+  "West Allis","Greenfield","Oak Creek","New Berlin","Glendale",
+  "Waukesha","Mequon","Franklin","Cudahy","South Milwaukee",
 ]
 
 async function ensurePipelines(organizationId: string) {
@@ -52,12 +75,59 @@ async function ensurePipelines(organizationId: string) {
   }
 }
 
+async function clearSeed(organizationId: string) {
+  const seedContacts = await prisma.contact.findMany({
+    where: {
+      organizationId,
+      OR: [
+        { firstName: { startsWith: "[SEED]" } },
+        { emails: { some: { email: { endsWith: "@seed.local" } } } },
+        { tags: { some: { tag: { name: "SEED" } } } },
+      ],
+    },
+    select: { id: true },
+  })
+  const seedIds = seedContacts.map((c) => c.id)
+  if (seedIds.length) {
+    await prisma.message.deleteMany({
+      where: { organizationId, thread: { contactId: { in: seedIds } } },
+    })
+    await prisma.communicationThread.deleteMany({
+      where: { organizationId, contactId: { in: seedIds } },
+    })
+    await prisma.activity.deleteMany({ where: { organizationId, contactId: { in: seedIds } } })
+    await prisma.task.deleteMany({ where: { organizationId, contactId: { in: seedIds } } })
+    await prisma.appointment.deleteMany({
+      where: { organizationId, contactId: { in: seedIds } },
+    })
+    await prisma.opportunity.deleteMany({
+      where: { organizationId, contactId: { in: seedIds } },
+    })
+    await prisma.contactRelationship.deleteMany({
+      where: {
+        OR: [{ fromContactId: { in: seedIds } }, { toContactId: { in: seedIds } }],
+      },
+    })
+    await prisma.contactProperty.deleteMany({ where: { contactId: { in: seedIds } } })
+    await prisma.contactFact.deleteMany({ where: { contactId: { in: seedIds } } })
+    await prisma.contactTag.deleteMany({ where: { contactId: { in: seedIds } } })
+    await prisma.contact.deleteMany({ where: { id: { in: seedIds } } })
+  }
+
+  await prisma.property.deleteMany({
+    where: {
+      organizationId,
+      OR: [{ line1: { startsWith: "[SEED]" } }, { mlsSource: "SEED" }],
+    },
+  })
+}
+
 async function main() {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Refusing to seed production")
   }
 
-  console.log("Seeding [SEED] development data…")
+  console.log("Seeding Harbor development data…")
 
   const email = "agent@seed.local"
   let user = await prisma.user.findUnique({ where: { email } })
@@ -65,7 +135,7 @@ async function main() {
     const passwordHash = await hashPassword("seedpassword123")
     user = await prisma.user.create({
       data: {
-        name: "[SEED] Demo Agent",
+        name: "Demo Agent",
         email,
         emailVerified: true,
         accounts: {
@@ -87,7 +157,7 @@ async function main() {
   if (!membership) {
     const org = await prisma.organization.create({
       data: {
-        name: "[SEED] Milwaukee Realty",
+        name: "Harbor Milwaukee Realty",
         slug: `seed-mke-${Date.now()}`,
         memberships: {
           create: { userId: user.id, role: "OWNER" },
@@ -102,79 +172,63 @@ async function main() {
 
   const organizationId = membership.organizationId
   await ensurePipelines(organizationId)
+  await clearSeed(organizationId)
 
-  // Clear prior seed CRM rows for idempotent re-seed of contacts labeled [SEED]
-  const seedContacts = await prisma.contact.findMany({
-    where: { organizationId, firstName: { startsWith: "[SEED]" } },
-    select: { id: true },
-  })
-  const seedIds = seedContacts.map((c) => c.id)
-  if (seedIds.length) {
-    await prisma.activity.deleteMany({ where: { organizationId, contactId: { in: seedIds } } })
-    await prisma.task.deleteMany({ where: { organizationId, contactId: { in: seedIds } } })
-    await prisma.appointment.deleteMany({
-      where: { organizationId, contactId: { in: seedIds } },
-    })
-    await prisma.opportunity.deleteMany({
-      where: { organizationId, contactId: { in: seedIds } },
-    })
-    await prisma.contactRelationship.deleteMany({
-      where: {
-        OR: [{ fromContactId: { in: seedIds } }, { toContactId: { in: seedIds } }],
-      },
-    })
-    await prisma.contactProperty.deleteMany({ where: { contactId: { in: seedIds } } })
-    await prisma.contactFact.deleteMany({ where: { contactId: { in: seedIds } } })
-    await prisma.contact.deleteMany({ where: { id: { in: seedIds } } })
-  }
-
-  await prisma.property.deleteMany({
-    where: { organizationId, line1: { startsWith: "[SEED]" } },
+  const seedTag = await prisma.tag.upsert({
+    where: { organizationId_name: { organizationId, name: "SEED" } },
+    create: { organizationId, name: "SEED", color: "#0d7377" },
+    update: {},
   })
 
-  const contactDefs = [
-    { first: "Sarah", last: "Nguyen", type: "BUYER" as const, temp: "HOT" as const, source: "Zillow" },
-    { first: "James", last: "Patel", type: "BUYER" as const, temp: "WARM" as const, source: "Referral" },
-    { first: "Emily", last: "Brooks", type: "SELLER" as const, temp: "HOT" as const, source: "Open house" },
-    { first: "Marcus", last: "Lee", type: "SELLER" as const, temp: "WARM" as const, source: "FSBO" },
-    { first: "Olivia", last: "Garcia", type: "PAST_CLIENT" as const, temp: "WARM" as const, source: "Past client" },
-    { first: "Daniel", last: "Kim", type: "SPHERE" as const, temp: "COLD" as const, source: "Sphere" },
-    { first: "Ava", last: "Johnson", type: "LEAD" as const, temp: "HOT" as const, source: "Website" },
-    { first: "Noah", last: "Williams", type: "LEAD" as const, temp: "COLD" as const, source: "Facebook" },
-    { first: "Sophia", last: "Martinez", type: "BUYER" as const, temp: "WARM" as const, source: "Realtor.com" },
-    { first: "Liam", last: "Anderson", type: "INVESTOR" as const, temp: "WARM" as const, source: "Networking" },
-    { first: "Mia", last: "Thomas", type: "VENDOR" as const, temp: null, source: "Preferred vendor" },
-    { first: "Ethan", last: "Moore", type: "LENDER" as const, temp: null, source: "Partner" },
-    { first: "Isabella", last: "Taylor", type: "ATTORNEY" as const, temp: null, source: "Partner" },
-    { first: "Lucas", last: "Jackson", type: "AGENT" as const, temp: null, source: "Co-op" },
-    { first: "Charlotte", last: "White", type: "BUYER" as const, temp: "HOT" as const, source: "Google Ads" },
-    { first: "Henry", last: "Harris", type: "SELLER" as const, temp: "COLD" as const, source: "Mailer" },
-    { first: "Amelia", last: "Clark", type: "SPHERE" as const, temp: "WARM" as const, source: "Church" },
-    { first: "Benjamin", last: "Lewis", type: "PAST_CLIENT" as const, temp: "WARM" as const, source: "Past client" },
-    { first: "Harper", last: "Robinson", type: "LEAD" as const, temp: "WARM" as const, source: "Open house" },
-    { first: "Alexander", last: "Walker", type: "BUYER" as const, temp: "HOT" as const, source: "Referral" },
+  const types = [
+    "BUYER","BUYER","SELLER","SELLER","PAST_CLIENT","SPHERE","LEAD","LEAD","BUYER","INVESTOR",
+    "VENDOR","LENDER","ATTORNEY","AGENT","BUYER","SELLER","SPHERE","PAST_CLIENT","LEAD","BUYER",
+  ] as const
+  const temps = ["HOT","WARM","HOT","WARM","WARM","COLD","HOT","COLD","WARM","WARM"] as const
+  const sources = [
+    "Zillow","Referral","Open house","FSBO","Past client","Sphere","Website","Facebook",
+    "Realtor.com","Networking","Preferred vendor","Partner","Partner","Co-op","Google Ads",
   ]
 
   const contacts = []
-  for (const [i, def] of contactDefs.entries()) {
+  for (let i = 0; i < 60; i++) {
+    const first = FIRST[i % FIRST.length]
+    const last = LAST[i % LAST.length]
+    const type = types[i % types.length]
+    const temp = type === "VENDOR" || type === "LENDER" || type === "ATTORNEY" || type === "AGENT"
+      ? null
+      : temps[i % temps.length]
     const c = await prisma.contact.create({
       data: {
         organizationId,
-        firstName: `[SEED] ${def.first}`,
-        lastName: def.last,
-        contactType: def.type,
-        temperature: def.temp,
-        source: def.source,
+        firstName: first,
+        lastName: `${last}${i >= 20 ? ` ${Math.floor(i / 20) + 1}` : ""}`,
+        contactType: type,
+        temperature: temp,
+        source: sources[i % sources.length],
         lifecycleStage: i % 5 === 0 ? "NEW" : "CONTACTED",
         consentEmail: true,
         consentSms: i % 3 !== 0,
-        firstContactAt: subDays(new Date(), 20 - (i % 15)),
-        lastContactedAt: i % 4 === 0 ? null : subDays(new Date(), i % 10),
-        notesSummary: `[SEED] Demo notes for ${def.first} ${def.last}`,
+        firstContactAt: subDays(new Date(), 40 - (i % 30)),
+        lastContactedAt: i % 4 === 0 ? null : subDays(new Date(), i % 14),
+        notesSummary: `${first} is evaluating options in ${CITIES[i % CITIES.length]}.`,
+        budgetMin: type === "BUYER" || type === "LEAD" ? 250000 + (i % 5) * 25000 : null,
+        budgetMax: type === "BUYER" || type === "LEAD" ? 400000 + (i % 6) * 40000 : null,
+        preferences:
+          type === "BUYER" || type === "LEAD"
+            ? {
+                cities: [CITIES[i % CITIES.length], CITIES[(i + 1) % CITIES.length]],
+                bedsMin: 2 + (i % 3),
+                bathsMin: 2,
+              }
+            : undefined,
+        tags: {
+          create: [{ tagId: seedTag.id }],
+        },
         emails: {
           create: [
             {
-              email: `${def.first.toLowerCase()}.${def.last.toLowerCase()}@seed.local`,
+              email: `${first.toLowerCase()}.${last.toLowerCase()}${i}@seed.local`,
               isPrimary: true,
               label: "primary",
             },
@@ -194,7 +248,6 @@ async function main() {
     contacts.push(c)
   }
 
-  // Relationships: spouse + referred_by
   await prisma.contactRelationship.createMany({
     data: [
       {
@@ -208,12 +261,6 @@ async function main() {
         fromContactId: contacts[4].id,
         toContactId: contacts[5].id,
         relationshipType: "spouse_of",
-      },
-      {
-        organizationId,
-        fromContactId: contacts[17].id,
-        toContactId: contacts[19].id,
-        relationshipType: "referred_by",
       },
     ],
   })
@@ -239,39 +286,29 @@ async function main() {
     ],
   })
 
-  const cities = [
-    "Wauwatosa",
-    "Milwaukee",
-    "Brookfield",
-    "Shorewood",
-    "Whitefish Bay",
-    "West Allis",
-    "Greenfield",
-    "Oak Creek",
-    "New Berlin",
-    "Glendale",
-  ]
-
+  const streets = ["Maple Ave","Oak St","Lake Dr","Capitol Dr","Bluemound Rd","North Ave"]
   const properties = []
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 24; i++) {
     const p = await prisma.property.create({
       data: {
         organizationId,
-        line1: `[SEED] ${100 + i * 11} Maple Ave`,
-        city: cities[i],
+        line1: `${100 + i * 11} ${streets[i % streets.length]}`,
+        city: CITIES[i % CITIES.length],
         state: "WI",
-        postalCode: `532${String(10 + i).padStart(2, "0")}`,
+        postalCode: `532${String(10 + (i % 20)).padStart(2, "0")}`,
         beds: 3 + (i % 3),
         baths: 2 + (i % 2) * 0.5,
-        sqft: 1400 + i * 120,
-        listPrice: 275000 + i * 25000,
-        status: i % 4 === 0 ? "ACTIVE" : i % 4 === 1 ? "PENDING" : "UNKNOWN",
+        sqft: 1400 + i * 80,
+        listPrice: 275000 + i * 18000,
+        status: i % 5 === 0 ? "PENDING" : "ACTIVE",
+        mlsSource: "SEED",
         provenance: "USER_ENTERED",
-        description: `[SEED] Demo property in ${cities[i]}`,
+        listedAt: i % 3 === 0 ? new Date() : subDays(new Date(), i + 2),
+        description: `${3 + (i % 3)} bed home in ${CITIES[i % CITIES.length]}.`,
         contacts: {
           create: [
             {
-              contactId: contacts[i].id,
+              contactId: contacts[i % contacts.length].id,
               role: i % 2 === 0 ? "OWNER" : "BUYER_INTEREST",
             },
           ],
@@ -289,76 +326,60 @@ async function main() {
     where: { organizationId, type: "SELLER", isDefault: true },
     include: { stages: true },
   })
-
   const stageByKey = (pipeline: typeof buyerPipeline, key: string) =>
     pipeline.stages.find((s) => s.key === key) ?? pipeline.stages[0]
 
-  const oppSpecs = [
-    { contact: contacts[0], type: "BUYER" as const, stage: "NEW", title: "Buyer hunt under $400k", temp: "HOT" as const },
-    { contact: contacts[1], type: "BUYER" as const, stage: "CONTACTED", title: "Condo search downtown", temp: "WARM" as const },
-    { contact: contacts[6], type: "BUYER" as const, stage: "ENGAGED", title: "First-time buyer consult", temp: "HOT" as const },
-    { contact: contacts[8], type: "BUYER" as const, stage: "QUALIFIED", title: "Pre-approved to $520k", temp: "WARM" as const },
-    { contact: contacts[14], type: "BUYER" as const, stage: "APPOINTMENT", title: "Touring Brookfield this week", temp: "HOT" as const },
-    { contact: contacts[19], type: "BUYER" as const, stage: "ACTIVE_CLIENT", title: "Active buyer — Shorewood", temp: "HOT" as const },
-    { contact: contacts[2], type: "SELLER" as const, stage: "QUALIFIED", title: "Listing consultation", temp: "HOT" as const },
-    { contact: contacts[3], type: "SELLER" as const, stage: "CONTACTED", title: "FSBO conversion", temp: "WARM" as const },
-    { contact: contacts[15], type: "SELLER" as const, stage: "NEW", title: "Mailer response — valuation", temp: "COLD" as const },
-    { contact: contacts[4], type: "SELLER" as const, stage: "PAST_CLIENT", title: "Past client re-engage", temp: "WARM" as const },
+  const stageKeys = [
+    "NEW","CONTACTED","ENGAGED","QUALIFIED","APPOINTMENT","ACTIVE_CLIENT",
+    "UNDER_CONTRACT","NURTURE","NEW","CONTACTED",
   ]
-
-  for (const spec of oppSpecs) {
-    const pipeline = spec.type === "BUYER" ? buyerPipeline : sellerPipeline
-    const stage = stageByKey(pipeline, spec.stage)
+  let oppCount = 0
+  for (let i = 0; i < 30; i++) {
+    const contact = contacts[i]
+    const isBuyer = i % 3 !== 0
+    const pipeline = isBuyer ? buyerPipeline : sellerPipeline
+    const stage = stageByKey(pipeline, stageKeys[i % stageKeys.length])
     const opp = await prisma.opportunity.create({
       data: {
         organizationId,
-        contactId: spec.contact.id,
+        contactId: contact.id,
         pipelineId: pipeline.id,
         pipelineStageId: stage.id,
-        type: spec.type,
-        title: `[SEED] ${spec.title}`,
-        temperature: spec.temp,
-        source: spec.contact.source,
+        type: isBuyer ? "BUYER" : "SELLER",
+        title: isBuyer
+          ? `${contact.firstName} buyer search`
+          : `${contact.firstName} listing consult`,
+        temperature: temps[i % temps.length],
+        source: sources[i % sources.length],
         assignedToUserId: user.id,
         nextAction: "Follow up",
-        nextActionAt: addDays(new Date(), spec.temp === "HOT" ? 0 : 2),
-        estimatedValue: 350000,
-        firstContactAt: subDays(new Date(), 5),
-        lastContactAt: spec.stage === "NEW" ? null : subDays(new Date(), 1),
+        nextActionAt: addDays(new Date(), i % 4 === 0 ? 0 : 2),
+        estimatedValue: 320000 + i * 12000,
+        firstContactAt: subDays(new Date(), 8),
+        lastContactAt: stage.key === "NEW" ? null : subDays(new Date(), 1),
       },
     })
-
-    await prisma.assignmentEvent.create({
-      data: {
-        organizationId,
-        opportunityId: opp.id,
-        toUserId: user.id,
-        actorUserId: user.id,
-        reason: "[SEED] Initial assignment",
-        source: "SYSTEM",
-      },
-    })
-
+    oppCount++
     await prisma.activity.create({
       data: {
         organizationId,
-        contactId: spec.contact.id,
+        contactId: contact.id,
         opportunityId: opp.id,
         actorUserId: user.id,
         type: "NOTE",
-        subject: "[SEED] Intake note",
-        body: `Seeded opportunity for ${spec.contact.firstName} ${spec.contact.lastName}`,
+        subject: "Intake note",
+        body: `Initial conversation with ${contact.firstName} ${contact.lastName}.`,
       },
     })
   }
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 16; i++) {
     await prisma.task.create({
       data: {
         organizationId,
-        title: `[SEED] Follow up with ${contacts[i].firstName}`,
+        title: `Follow up with ${contacts[i].firstName}`,
         priority: i % 3 === 0 ? "HIGH" : "MEDIUM",
-        status: "OPEN",
+        status: i % 5 === 0 ? "COMPLETED" : "OPEN",
         dueAt: i % 2 === 0 ? addHours(new Date(), i) : subDays(new Date(), 1),
         contactId: contacts[i].id,
         assigneeUserId: user.id,
@@ -371,7 +392,7 @@ async function main() {
     data: [
       {
         organizationId,
-        title: `[SEED] Buyer consult — ${contacts[0].firstName}`,
+        title: `Buyer consult — ${contacts[0].firstName}`,
         startsAt: addHours(new Date(), 3),
         endsAt: addHours(new Date(), 4),
         contactId: contacts[0].id,
@@ -380,7 +401,7 @@ async function main() {
       },
       {
         organizationId,
-        title: `[SEED] Listing appointment — ${contacts[2].firstName}`,
+        title: `Listing appointment — ${contacts[2].firstName}`,
         startsAt: addDays(new Date(), 1),
         contactId: contacts[2].id,
         propertyId: properties[2].id,
@@ -389,7 +410,7 @@ async function main() {
       },
       {
         organizationId,
-        title: `[SEED] Showing — Maple Ave`,
+        title: "Showing — Maple Ave",
         startsAt: addHours(new Date(), 6),
         contactId: contacts[14].id,
         propertyId: properties[4].id,
@@ -398,10 +419,45 @@ async function main() {
     ],
   })
 
+  // Message threads for Inbox
+  for (let i = 0; i < 6; i++) {
+    const thread = await prisma.communicationThread.create({
+      data: {
+        organizationId,
+        contactId: contacts[i].id,
+        channel: i % 2 === 0 ? "EMAIL" : "SMS",
+        subject: i % 2 === 0 ? `Following up with ${contacts[i].firstName}` : null,
+        lastMessageAt: subDays(new Date(), i),
+      },
+    })
+    await prisma.message.createMany({
+      data: [
+        {
+          organizationId,
+          threadId: thread.id,
+          direction: "OUTBOUND",
+          body: `Hi ${contacts[i].firstName} — checking in on your timeline.`,
+          status: "SENT",
+          providerName: "SEED",
+        },
+        {
+          organizationId,
+          threadId: thread.id,
+          direction: "INBOUND",
+          body: "Thanks — can we talk later this week?",
+          status: "RECEIVED",
+          providerName: "SEED",
+        },
+      ],
+    })
+  }
+
   console.log("Seed complete.")
   console.log(`  Login: ${email} / seedpassword123`)
   console.log(`  Org: ${membership.organization.name}`)
-  console.log(`  Contacts: ${contacts.length}, Properties: ${properties.length}, Opportunities: ${oppSpecs.length}`)
+  console.log(
+    `  Contacts: ${contacts.length}, Properties: ${properties.length}, Opportunities: ${oppCount}`,
+  )
 }
 
 main()

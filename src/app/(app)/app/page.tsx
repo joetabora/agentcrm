@@ -1,22 +1,39 @@
 import Link from "next/link"
-import { format } from "date-fns"
+import { format, startOfDay } from "date-fns"
 import { getDashboardData } from "@/domain/dashboard/service"
+import { listThreads } from "@/domain/comms/service"
+import { matchContactsForProperty } from "@/domain/properties/service"
 import { requireOrgContext } from "@/server/session"
-import { EmptyState, PageHeader, TemperatureBadge } from "@/components/crm/shared"
-import { TaskActionBar } from "@/components/crm/task-action-bar"
 import { AgendaOfflineSection } from "@/components/pwa/agenda-offline-section"
-import {
-  cancelAppointmentAction,
-  completeAppointmentAction,
-} from "@/app/actions"
+import { AIInsight } from "@/components/patterns/ai"
+import { Metric, PageShell, SectionHeader } from "@/components/patterns/page"
+import { StatusBadge, TemperatureBadge } from "@/components/patterns/status-badge"
+import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { StashedAgendaItem } from "@/lib/offline/types"
+import { prisma } from "@/lib/db"
 
-export default async function DashboardPage() {
+export default async function HomePage() {
   const ctx = await requireOrgContext()
-  const data = await getDashboardData(ctx.organization.id, ctx.user.id)
+  const todayStart = startOfDay(new Date())
+  const [data, threads, recentListings] = await Promise.all([
+    getDashboardData(ctx.organization.id, ctx.user.id),
+    listThreads(ctx.organization.id, { take: 8 }),
+    prisma.property.findMany({
+      where: {
+        organizationId: ctx.organization.id,
+        listedAt: { gte: todayStart },
+      },
+      take: 3,
+      orderBy: { listedAt: "desc" },
+    }),
+  ])
+
+  const openTasksToday = data.rankedAgenda.filter((i) => i.kind === "task").length
+  const firstName = ctx.user.name.split(" ")[0] || "there"
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
 
   const agendaItems: StashedAgendaItem[] = data.rankedAgenda.map((item) => ({
     kind: item.kind,
@@ -30,215 +47,198 @@ export default async function DashboardPage() {
     priority: item.priority,
   }))
 
+  const matchCards: Array<{
+    contactName: string
+    contactId: string
+    propertyLabel: string
+    propertyId: string
+    score: number
+  }> = []
+
+  for (const listing of recentListings) {
+    const matches = await matchContactsForProperty(ctx.organization.id, listing.id, 2)
+    for (const m of matches.slice(0, 1)) {
+      matchCards.push({
+        contactName: `${m.contact.firstName} ${m.contact.lastName}`,
+        contactId: m.contact.id,
+        propertyLabel: listing.line1,
+        propertyId: listing.id,
+        score: Math.round(m.score),
+      })
+    }
+  }
+
+  const reengage = data.coldContacts.slice(0, 2)
+
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        description="Ranked agenda — scores are deterministic and explained"
-        actions={
-          <>
-            <Link
-              href="/app/tasks"
-              className="inline-flex h-8 items-center rounded-lg border px-3 text-sm"
-            >
-              Manage tasks
-            </Link>
-            <Link
-              href="/app/leads/new"
-              className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-primary-foreground"
-            >
-              New lead
-            </Link>
-          </>
-        }
-      />
+    <PageShell
+      title={`${greeting}, ${firstName}.`}
+      description={`Here’s what needs your attention · ${format(new Date(), "EEEE, MMM d")}`}
+      actions={
+        <>
+          <Link href="/app/tasks" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            Tasks
+          </Link>
+          <Link href="/app/leads/new" className={cn(buttonVariants({ size: "sm" }))}>
+            New lead
+          </Link>
+        </>
+      }
+    >
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Tasks due" value={openTasksToday} hint="On today’s agenda" />
+        <Metric
+          label="Appointments"
+          value={data.appointmentsToday.length}
+          hint="Scheduled today"
+        />
+        <Metric label="New leads" value={data.newLeads.length} hint="Created today" />
+        <Metric label="Messages" value={threads.length} hint="Recent threads" />
+      </section>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Open pipeline</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.pipeline.open}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Buyers</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.pipeline.buyers}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Sellers</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{data.pipeline.sellers}</CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-3">
-          <AgendaOfflineSection items={agendaItems} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Appointments today</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.appointmentsToday.length === 0 ? (
-                <EmptyState
-                  title="No appointments today"
-                  description="Scheduled meetings will appear here."
-                />
-              ) : (
-                data.appointmentsToday.map((a) => (
-                  <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-6">
+          <section>
+            <SectionHeader title="Attention required" />
+            <Card className="shadow-[var(--shadow-card)]">
+              <CardContent className="divide-y p-0">
+                {data.overdueTasks.slice(0, 4).map((t) => (
+                  <div key={t.id} className="flex items-start justify-between gap-3 px-4 py-3">
                     <div className="min-w-0">
-                      <span className="font-medium">{a.title}</span>
-                      <span className="ml-2 text-muted-foreground">
-                        {format(a.startsAt, "h:mm a")}
-                      </span>
+                      <p className="text-sm font-medium">Call overdue</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t.title}
+                        {t.contact
+                          ? ` · ${t.contact.firstName} ${t.contact.lastName}`
+                          : ""}
+                        {t.dueAt ? ` · due ${format(t.dueAt, "MMM d")}` : ""}
+                      </p>
                     </div>
-                    <div className="flex gap-1">
-                      <form action={completeAppointmentAction}>
-                        <input type="hidden" name="appointmentId" value={a.id} />
-                        <input type="hidden" name="redirectTo" value="/app" />
-                        <Button type="submit" size="sm" variant="outline">
-                          Done
-                        </Button>
-                      </form>
-                      <form action={cancelAppointmentAction}>
-                        <input type="hidden" name="appointmentId" value={a.id} />
-                        <input type="hidden" name="redirectTo" value="/app" />
-                        <Button type="submit" size="sm" variant="ghost">
-                          Cancel
-                        </Button>
-                      </form>
+                    <StatusBadge tone="warning">Overdue</StatusBadge>
+                  </div>
+                ))}
+                {data.hotLeads.slice(0, 3).map((o) => (
+                  <div key={o.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Hot lead needs follow-up</p>
+                      <p className="text-xs text-muted-foreground">
+                        {o.contact.firstName} {o.contact.lastName} · {o.title}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TemperatureBadge value={o.temperature} />
+                      <Link
+                        href={`/app/leads/${o.id}`}
+                        className={cn(buttonVariants({ variant: "outline", size: "xs" }))}
+                      >
+                        Open
+                      </Link>
                     </div>
                   </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+                ))}
+                {data.overdueTasks.length === 0 && data.hotLeads.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">
+                    Nothing urgent right now. Your agenda below is clear to work.
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">New leads</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.newLeads.length === 0 ? (
-                <EmptyState
-                  title="No new leads today"
-                  description="Leads created today show up here."
-                  actionHref="/app/leads/new"
-                  actionLabel="Add lead"
-                />
-              ) : (
-                data.newLeads.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between gap-2 text-sm">
-                    <Link href={`/app/leads/${o.id}`} className="truncate font-medium hover:underline">
-                      {o.title}
-                    </Link>
-                    <TemperatureBadge value={o.temperature} />
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+          <AgendaOfflineSection items={agendaItems} />
         </div>
 
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold tracking-wide uppercase">Attention required</h2>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Overdue tasks</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.overdueTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing overdue.</p>
-              ) : (
-                data.overdueTasks.map((t) => (
-                  <div key={t.id} className="space-y-2 rounded-md border p-2">
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="truncate">{t.title}</span>
-                      <Badge variant="destructive">Overdue</Badge>
-                    </div>
-                    <TaskActionBar taskId={t.id} redirectTo="/app" compact />
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Overdue follow-ups</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.overdueFollowUps.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No overdue next actions.</p>
-              ) : (
-                data.overdueFollowUps.map((o) => (
-                  <div key={o.id} className="text-sm">
-                    <Link href={`/app/leads/${o.id}`} className="font-medium hover:underline">
-                      {o.title}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{o.reasons.join(" · ")}</p>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Hot leads</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.hotLeads.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No hot leads right now.</p>
-              ) : (
-                data.hotLeads.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between gap-2 text-sm">
-                    <Link href={`/app/leads/${o.id}`} className="truncate hover:underline">
-                      {o.contact.firstName} {o.contact.lastName}
-                    </Link>
-                    <span className="text-muted-foreground">{o.pipelineStage.name}</span>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Uncontacted / cold</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {data.uncontactedLeads.length === 0 && data.coldContacts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Inbox looks clear.</p>
-              ) : (
-                <>
-                  {data.uncontactedLeads.map((o) => (
-                    <div key={o.id} className="text-sm">
-                      <Link href={`/app/leads/${o.id}`} className="hover:underline">
-                        {o.title}
+        <div className="space-y-6">
+          <section>
+            <SectionHeader title="AI opportunities" />
+            <p className="mb-3 text-sm text-muted-foreground">Things worth your attention.</p>
+            <div className="space-y-3">
+              {matchCards.map((m) => (
+                <AIInsight
+                  key={`${m.contactId}-${m.propertyId}`}
+                  title="High-value buyer opportunity"
+                  subtitle={`${m.score}% match`}
+                  body={
+                    <p>
+                      <span className="font-medium text-foreground">{m.contactName}</span> matches{" "}
+                      <span className="font-medium text-foreground">{m.propertyLabel}</span>.
+                    </p>
+                  }
+                  actions={
+                    <>
+                      <Link
+                        href={`/app/properties/${m.propertyId}`}
+                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                      >
+                        View property
                       </Link>
-                      <span className="text-muted-foreground"> · uncontacted</span>
-                    </div>
-                  ))}
-                  {data.coldContacts.map((c) => (
-                    <div key={c.id} className="text-sm">
-                      <Link href={`/app/contacts/${c.id}`} className="hover:underline">
+                      <Link
+                        href={`/app/contacts/${m.contactId}`}
+                        className={cn(buttonVariants({ size: "sm" }))}
+                      >
+                        Draft message
+                      </Link>
+                    </>
+                  }
+                />
+              ))}
+              {reengage.map((c) => (
+                <AIInsight
+                  key={c.id}
+                  title="Re-engagement opportunity"
+                  body={
+                    <p>
+                      <span className="font-medium text-foreground">
                         {c.firstName} {c.lastName}
-                      </Link>
-                      <span className="text-muted-foreground"> · no recent contact</span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </section>
+                      </span>{" "}
+                      has been quiet
+                      {c.lastContactedAt
+                        ? ` since ${format(c.lastContactedAt, "MMM d")}`
+                        : " with no recorded contact"}
+                      .
+                    </p>
+                  }
+                  actions={
+                    <Link
+                      href={`/app/contacts/${c.id}`}
+                      className={cn(buttonVariants({ size: "sm" }))}
+                    >
+                      Contact {c.firstName}
+                    </Link>
+                  }
+                />
+              ))}
+              {matchCards.length === 0 && reengage.length === 0 ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">No AI opportunities yet</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    As buyer preferences and listing activity accumulate, recommendations will appear
+                    here.
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader
+              title="Pipeline"
+              action={
+                <Link href="/app/pipeline" className="text-xs font-medium text-primary hover:underline">
+                  View board
+                </Link>
+              }
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <Metric label="Open" value={data.pipeline.open} />
+              <Metric label="Buyers" value={data.pipeline.buyers} />
+              <Metric label="Sellers" value={data.pipeline.sellers} />
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

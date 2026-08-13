@@ -57,6 +57,45 @@ export async function listThreadsForContact(organizationId: string, contactId: s
   })
 }
 
+export async function listThreads(
+  organizationId: string,
+  filters?: { channel?: CommChannel; take?: number },
+) {
+  return prisma.communicationThread.findMany({
+    where: {
+      organizationId,
+      ...(filters?.channel ? { channel: filters.channel } : {}),
+    },
+    include: {
+      contact: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          temperature: true,
+          contactType: true,
+        },
+      },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
+    take: filters?.take ?? 50,
+  })
+}
+
+export async function getThread(organizationId: string, threadId: string) {
+  return prisma.communicationThread.findFirst({
+    where: { id: threadId, organizationId },
+    include: {
+      contact: true,
+      messages: { orderBy: { createdAt: "asc" }, take: 200 },
+    },
+  })
+}
+
 async function getOrCreateThread(input: {
   organizationId: string
   contactId: string

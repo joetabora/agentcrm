@@ -308,7 +308,7 @@ export async function addParty(
 
   let name = data.name?.trim()
   let email = data.email ?? null
-  let contactId = data.contactId ?? null
+  const contactId = data.contactId ?? null
 
   if (contactId) {
     const contact = await prisma.contact.findFirst({

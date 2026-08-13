@@ -1,4 +1,12 @@
 import type { ReportCell, ReportColumn, ReportRun } from "@/domain/reports/types"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
 function formatCell(key: string, value: ReportCell): string {
   if (value == null) return "—"
@@ -40,37 +48,35 @@ export function formatSummaryValue(key: string, value: ReportCell): string {
 
 export function ReportResultsTable({ run }: { run: ReportRun }) {
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/50">
-          <tr>
+    <div className="overflow-hidden rounded-xl border bg-card shadow-[var(--shadow-card)]">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
             {run.columns.map((col: ReportColumn) => (
-              <th key={col.key} className="px-3 py-2 text-left font-medium">
-                {col.label}
-              </th>
+              <TableHead key={col.key}>{col.label}</TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {run.rows.length === 0 ? (
-            <tr>
-              <td className="px-3 py-4 text-muted-foreground" colSpan={run.columns.length}>
+            <TableRow>
+              <TableCell className="text-muted-foreground" colSpan={run.columns.length}>
                 No rows in this range.
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             run.rows.map((row, i) => (
-              <tr key={i} className="border-t">
+              <TableRow key={i}>
                 {run.columns.map((col) => (
-                  <td key={col.key} className="px-3 py-2 tabular-nums">
+                  <TableCell key={col.key} className="tabular-nums">
                     {formatCell(col.key, row[col.key] ?? null)}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }

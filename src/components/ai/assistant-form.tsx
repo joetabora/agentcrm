@@ -7,9 +7,9 @@ import {
   confirmAssistantActionAction,
   createContactFactAction,
 } from "@/app/actions"
-import { Badge } from "@/components/ui/badge"
+import { AIBadge, AIInsight, NativeSelect, NativeTextarea, StatusBadge } from "@/components/patterns"
+import { AssistantSessionList } from "@/components/ai/assistant-session-list"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
@@ -69,25 +69,27 @@ function sourceHref(s: Source): string | null {
   }
 }
 
-function kindClass(kind: Claim["kind"]) {
+function kindTone(kind: Claim["kind"]): "success" | "info" | "warning" | "default" | "ai" {
   switch (kind) {
     case "FACT":
-      return "border-emerald-600/40 text-emerald-800 dark:text-emerald-300"
+      return "success"
     case "CALCULATION":
-      return "border-sky-600/40 text-sky-800 dark:text-sky-300"
+      return "info"
     case "INFERENCE":
-      return "border-amber-600/40 text-amber-800 dark:text-amber-300"
+      return "warning"
     default:
-      return "border-muted-foreground/40 text-muted-foreground"
+      return "ai"
   }
 }
 
 export function AssistantForm({
   contacts,
   initialContactId,
+  providerName,
 }: {
   contacts: ContactOption[]
   initialContactId?: string
+  providerName?: string
 }) {
   const [question, setQuestion] = useState("")
   const [contactId, setContactId] = useState(initialContactId ?? "")
@@ -95,18 +97,23 @@ export function AssistantForm({
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [actionStatus, setActionStatus] = useState<Record<string, ActionStatus>>({})
+  const [sessionLatest, setSessionLatest] = useState<string | null>(null)
+
+  const selectedContact = contacts.find((c) => c.id === contactId)
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setActionStatus({})
+    const q = question.trim()
     startTransition(async () => {
       try {
         const res = await askAssistantAction({
-          question,
+          question: q,
           contactId: contactId || null,
         })
         setResult(res)
+        setSessionLatest(q)
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ask failed")
       }
@@ -157,86 +164,94 @@ export function AssistantForm({
   const proposed = result?.response.proposedActions ?? []
 
   return (
-    <div className="space-y-6">
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="contactId">Optional contact scope</Label>
-          <select
-            id="contactId"
-            value={contactId}
-            onChange={(e) => setContactId(e.target.value)}
-            className="flex h-10 w-full rounded-lg border bg-background px-3 text-sm"
-          >
-            <option value="">Entire organization (search + snapshot)</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="question">Question</Label>
-          <textarea
-            id="question"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            rows={4}
-            required
-            placeholder="e.g. What is this contact’s budget and next open task?"
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-          />
-        </div>
-        <Button type="submit" disabled={pending || !question.trim()}>
-          {pending ? "Working…" : "Ask assistant"}
-        </Button>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      </form>
+    <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_240px]">
+      <aside className="order-2 min-h-[200px] lg:order-1 lg:min-h-[420px]">
+        <AssistantSessionList
+          latestQuestion={sessionLatest}
+          onSelect={(q) => setQuestion(q)}
+        />
+      </aside>
 
-      {result ? (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>
-              Provider: <strong className="text-foreground">{result.provider}</strong>
+      <div className="order-1 space-y-4 lg:order-2">
+        <form
+          onSubmit={onSubmit}
+          className="space-y-3 rounded-xl border border-ai/20 bg-ai-surface/40 p-4 shadow-[var(--shadow-card)]"
+        >
+          <div className="flex items-center gap-2">
+            <AIBadge />
+            <span className="text-xs text-muted-foreground">
+              {providerName ? `Provider: ${providerName}` : "Grounded CRM Q&A"}
             </span>
-            <span>·</span>
-            <span>
-              Model: <strong className="text-foreground">{result.model}</strong>
-            </span>
-            {result.response.refused ? (
-              <Badge variant="outline" className="border-amber-600/50 text-amber-800">
-                Refused
-                {result.response.refuseReason ? `: ${result.response.refuseReason}` : ""}
-              </Badge>
-            ) : null}
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="contactId">Optional contact scope</Label>
+            <NativeSelect
+              id="contactId"
+              value={contactId}
+              onChange={(e) => setContactId(e.target.value)}
+            >
+              <option value="">Entire organization (search + snapshot)</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="question">Question</Label>
+            <NativeTextarea
+              id="question"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              rows={4}
+              required
+              placeholder="e.g. What is this contact’s budget and next open task?"
+            />
+          </div>
+          <Button type="submit" disabled={pending || !question.trim()}>
+            {pending ? "Working…" : "Ask assistant"}
+          </Button>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </form>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Answer</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                {result.response.answerMarkdown}
-              </div>
-            </CardContent>
-          </Card>
+        {result ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                Provider: <strong className="text-foreground">{result.provider}</strong>
+              </span>
+              <span>·</span>
+              <span>
+                Model: <strong className="text-foreground">{result.model}</strong>
+              </span>
+              {result.response.refused ? (
+                <StatusBadge tone="warning">
+                  Refused
+                  {result.response.refuseReason ? `: ${result.response.refuseReason}` : ""}
+                </StatusBadge>
+              ) : null}
+            </div>
 
-          {result.response.claims.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Labeled claims</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <AIInsight
+              title="Answer"
+              body={
+                <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                  {result.response.answerMarkdown}
+                </div>
+              }
+            />
+
+            {result.response.claims.length > 0 ? (
+              <div className="space-y-3 rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+                <h3 className="text-sm font-medium">Labeled claims</h3>
                 {result.response.claims.map((c, i) => (
                   <div
                     key={`${i}-${c.text.slice(0, 24)}`}
-                    className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between"
+                    className="flex flex-col gap-2 rounded-lg border border-ai/15 bg-ai-surface/30 p-3 sm:flex-row sm:items-start sm:justify-between"
                   >
                     <div className="min-w-0 space-y-1">
-                      <Badge variant="outline" className={cn(kindClass(c.kind))}>
-                        {c.kind}
-                      </Badge>
+                      <StatusBadge tone={kindTone(c.kind)}>{c.kind}</StatusBadge>
                       <p className="text-sm">{c.text}</p>
                     </div>
                     {contactId && (c.kind === "INFERENCE" || c.kind === "FACT") ? (
@@ -256,16 +271,12 @@ export function AssistantForm({
                     ) : null}
                   </div>
                 ))}
-              </CardContent>
-            </Card>
-          ) : null}
+              </div>
+            ) : null}
 
-          {proposed.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Proposed actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            {proposed.length > 0 ? (
+              <div className="space-y-3 rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+                <h3 className="text-sm font-medium">Proposed actions</h3>
                 <p className="text-xs text-muted-foreground">
                   Nothing runs until you confirm. High-risk actions (email, SMS, stage, enroll)
                   always need explicit approval.
@@ -277,24 +288,20 @@ export function AssistantForm({
                     status.state === "error" ||
                     status.state === "dismissed"
                   return (
-                    <div key={action.id} className="space-y-2 rounded-md border p-3">
+                    <div
+                      key={action.id}
+                      className="space-y-2 rounded-lg border border-ai/15 bg-ai-surface/20 p-3"
+                    >
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{action.tool}</Badge>
-                        <Badge
-                          variant="outline"
-                          className={
-                            action.risk === "high"
-                              ? "border-amber-600/50 text-amber-800"
-                              : undefined
-                          }
-                        >
+                        <StatusBadge tone="ai">{action.tool}</StatusBadge>
+                        <StatusBadge tone={action.risk === "high" ? "warning" : "outline"}>
                           {action.risk === "high" ? "high risk" : "low risk"}
-                        </Badge>
+                        </StatusBadge>
                       </div>
                       {action.rationale ? (
                         <p className="text-sm text-muted-foreground">{action.rationale}</p>
                       ) : null}
-                      <pre className="overflow-x-auto rounded bg-muted/50 p-2 text-xs">
+                      <pre className="overflow-x-auto rounded-lg bg-muted/50 p-2 text-xs">
                         {JSON.stringify(action.args, null, 2)}
                       </pre>
                       {status.message ? (
@@ -304,7 +311,7 @@ export function AssistantForm({
                             status.state === "error"
                               ? "text-destructive"
                               : status.state === "ok"
-                                ? "text-emerald-700 dark:text-emerald-400"
+                                ? "text-success"
                                 : "text-muted-foreground",
                           )}
                         >
@@ -335,22 +342,18 @@ export function AssistantForm({
                     </div>
                   )
                 })}
-              </CardContent>
-            </Card>
-          ) : null}
+              </div>
+            ) : null}
 
-          {result.sources.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Sources used</CardTitle>
-              </CardHeader>
-              <CardContent>
+            {result.sources.length > 0 ? (
+              <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+                <h3 className="mb-2 text-sm font-medium">Sources used</h3>
                 <ul className="space-y-1 text-sm">
                   {result.sources.map((s) => {
                     const href = sourceHref(s)
                     return (
                       <li key={`${s.type}-${s.id}`} className="flex gap-2">
-                        <Badge variant="outline">{s.type}</Badge>
+                        <StatusBadge tone="outline">{s.type}</StatusBadge>
                         {href ? (
                           <Link
                             href={href}
@@ -365,11 +368,48 @@ export function AssistantForm({
                     )
                   })}
                 </ul>
-              </CardContent>
-            </Card>
-          ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <aside className="order-3 space-y-3">
+        <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+          <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Context
+          </h3>
+          {selectedContact ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium">{selectedContact.label}</p>
+              <Link
+                href={`/app/contacts/${selectedContact.id}`}
+                className="text-xs text-primary underline-offset-2 hover:underline"
+              >
+                Open contact
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                Answers prefer facts, tasks, and activities linked to this contact.
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">
+              No contact scoped. The assistant searches org-wide CRM snapshots.
+            </p>
+          )}
         </div>
-      ) : null}
+        <div className="rounded-xl border border-ai/20 bg-ai-surface p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <AIBadge />
+            <span className="text-xs font-medium text-ai">Tips</span>
+          </div>
+          <ul className="list-disc space-y-1.5 pl-4 text-xs text-muted-foreground">
+            <li>Ask about budget, stage, open tasks, or last touch.</li>
+            <li>Proposed actions never run until you confirm.</li>
+            <li>Save solid FACT / INFERENCE claims as ContactFacts.</li>
+          </ul>
+        </div>
+      </aside>
     </div>
   )
 }

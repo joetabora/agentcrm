@@ -7,8 +7,14 @@ import {
 import { listSavedViews } from "@/domain/saved-views/service"
 import { listOrgMembers } from "@/domain/orgs/members"
 import { requireOrgContext } from "@/server/session"
-import { EmptyState, PageHeader, TemperatureBadge } from "@/components/crm/shared"
-import { Badge } from "@/components/ui/badge"
+import {
+  EmptyState,
+  NativeSelect,
+  PageShell,
+  SearchInput,
+  StatusBadge,
+  TemperatureBadge,
+} from "@/components/patterns"
 import {
   Table,
   TableBody,
@@ -19,6 +25,8 @@ import {
 } from "@/components/ui/table"
 import { LeadsBulkBar } from "@/components/crm/leads-bulk-bar"
 import { createSavedViewAction, deleteSavedViewAction } from "@/app/actions"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 function buildHref(base: Record<string, string | undefined>) {
   const sp = new URLSearchParams()
@@ -55,83 +63,62 @@ export default async function LeadsPage({
   }
 
   return (
-    <div>
-      <PageHeader
-        title="Leads"
-        description="Filter, save views, and bulk-update opportunities"
-        actions={
-          <>
-            <Link
-              href="/app/settings/routing"
-              className="inline-flex h-8 items-center rounded-lg border px-3 text-sm"
-            >
-              Routing rules
-            </Link>
-            <Link
-              href="/app/pipeline"
-              className="inline-flex h-8 items-center rounded-lg border px-3 text-sm"
-            >
-              Pipeline board
-            </Link>
-            <Link
-              href="/app/leads/new"
-              className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm text-primary-foreground"
-            >
-              New lead
-            </Link>
-          </>
-        }
-      />
-
-      <form className="mb-4 grid gap-2 rounded-lg border p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <input
+    <PageShell
+      title="Leads"
+      description="Filter, save views, and bulk-update opportunities"
+      actions={
+        <>
+          <Link
+            href="/app/settings/routing"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Routing rules
+          </Link>
+          <Link
+            href="/app/pipeline"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Pipeline board
+          </Link>
+          <Link href="/app/leads/new" className={cn(buttonVariants({ size: "sm" }))}>
+            New lead
+          </Link>
+        </>
+      }
+    >
+      <form className="mb-4 grid gap-2 rounded-xl border bg-card p-3 shadow-[var(--shadow-card)] sm:grid-cols-2 lg:grid-cols-4">
+        <SearchInput
           name="q"
           defaultValue={filters.q ?? ""}
           placeholder="Search title/contact"
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8"
         />
-        <select
-          name="type"
-          defaultValue={filters.type ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
+        <NativeSelect name="type" defaultValue={filters.type ?? ""}>
           <option value="">All types</option>
           <option value="BUYER">BUYER</option>
           <option value="SELLER">SELLER</option>
-        </select>
-        <select
-          name="stageKey"
-          defaultValue={filters.stageKey ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
+        </NativeSelect>
+        <NativeSelect name="stageKey" defaultValue={filters.stageKey ?? ""}>
           <option value="">All stages</option>
           {uniqueStages.map((s) => (
             <option key={s.key} value={s.key}>
               {s.name}
             </option>
           ))}
-        </select>
-        <select
-          name="temperature"
-          defaultValue={filters.temperature ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
+        </NativeSelect>
+        <NativeSelect name="temperature" defaultValue={filters.temperature ?? ""}>
           <option value="">All temps</option>
           <option value="COLD">COLD</option>
           <option value="WARM">WARM</option>
           <option value="HOT">HOT</option>
-        </select>
+        </NativeSelect>
         <input
           name="source"
           defaultValue={filters.source ?? ""}
           placeholder="Source contains…"
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <select
-          name="assignee"
-          defaultValue={filters.assignee ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
+        <NativeSelect name="assignee" defaultValue={filters.assignee ?? ""}>
           <option value="">Any assignee</option>
           <option value="me">Assigned to me</option>
           <option value="unassigned">Unassigned</option>
@@ -140,18 +127,18 @@ export default async function LeadsPage({
               {m.user.name}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         <input
           name="createdFrom"
           type="date"
           defaultValue={filters.createdFrom ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <input
           name="createdTo"
           type="date"
           defaultValue={filters.createdTo ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -177,9 +164,9 @@ export default async function LeadsPage({
           min={1}
           placeholder="Inactive days"
           defaultValue={filters.inactiveDays ?? ""}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <button type="submit" className="h-8 rounded-md bg-primary px-3 text-sm text-primary-foreground">
+        <button type="submit" className={cn(buttonVariants({ size: "sm" }), "h-8")}>
           Apply filters
         </button>
       </form>
@@ -222,7 +209,7 @@ export default async function LeadsPage({
         })}
       </div>
 
-      <details className="mb-4 rounded-lg border p-3 text-sm">
+      <details className="mb-4 rounded-xl border bg-card p-3 text-sm shadow-[var(--shadow-card)]">
         <summary className="cursor-pointer font-medium">Save current filters as view</summary>
         <form action={createSavedViewAction} className="mt-3 flex flex-wrap gap-2">
           <input type="hidden" name="entity" value="LEADS" />
@@ -231,13 +218,13 @@ export default async function LeadsPage({
             name="name"
             required
             placeholder="View name"
-            className="h-8 min-w-[180px] flex-1 rounded-md border bg-background px-2"
+            className="h-8 min-w-[180px] flex-1 rounded-lg border border-input bg-background px-2.5"
           />
           <label className="flex items-center gap-2">
             <input type="checkbox" name="isShared" value="1" />
             Share with org
           </label>
-          <button type="submit" className="h-8 rounded-md border px-3">
+          <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Save view
           </button>
         </form>
@@ -273,9 +260,9 @@ export default async function LeadsPage({
           actionLabel="New lead"
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-[var(--shadow-card)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
               <TableRow>
                 <TableHead className="w-8" />
                 <TableHead>Title</TableHead>
@@ -283,8 +270,8 @@ export default async function LeadsPage({
                 <TableHead>Type</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead>Temp</TableHead>
-                <TableHead>Assignee</TableHead>
-                <TableHead>Source</TableHead>
+                <TableHead className="hidden md:table-cell">Assignee</TableHead>
+                <TableHead className="hidden lg:table-cell">Source</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -304,16 +291,20 @@ export default async function LeadsPage({
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{o.type}</Badge>
+                    <StatusBadge tone="outline">{o.type}</StatusBadge>
                   </TableCell>
-                  <TableCell>{o.pipelineStage.name}</TableCell>
+                  <TableCell>
+                    <StatusBadge>{o.pipelineStage.name}</StatusBadge>
+                  </TableCell>
                   <TableCell>
                     <TemperatureBadge value={o.temperature} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="hidden text-muted-foreground md:table-cell">
                     {o.assignedTo?.name ?? "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{o.source ?? "—"}</TableCell>
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">
+                    {o.source ?? "—"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -326,6 +317,6 @@ export default async function LeadsPage({
           Shareable filter URL query: ?{currentQuery.toString()}
         </p>
       ) : null}
-    </div>
+    </PageShell>
   )
 }

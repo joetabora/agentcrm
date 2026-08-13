@@ -191,7 +191,7 @@ export default async function PropertyDetailPage({
             </p>
           ) : (
             matches.map((m) => (
-              <div key={m.contact.id} className="rounded-md border p-3">
+              <div key={m.contact.id} className="rounded-xl border bg-card p-3 shadow-[var(--shadow-card)]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <Link
                     href={`/app/contacts/${m.contact.id}`}
@@ -199,9 +199,20 @@ export default async function PropertyDetailPage({
                   >
                     {m.contact.firstName} {m.contact.lastName}
                   </Link>
-                  <Badge variant="secondary">score {m.score}</Badge>
+                  <Badge variant="secondary" className="tabular-nums">
+                    {Math.round(m.score)}% match
+                  </Badge>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{m.reasons.join(" · ")}</p>
+                <ul className="mt-2 space-y-1">
+                  {m.reasons.map((reason) => (
+                    <li key={reason} className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <span className="mt-0.5 text-success" aria-hidden>
+                        ✓
+                      </span>
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
                 <form action={saveBuyerInterestAction} className="mt-2">
                   <input type="hidden" name="contactId" value={m.contact.id} />
                   <input type="hidden" name="propertyId" value={property.id} />

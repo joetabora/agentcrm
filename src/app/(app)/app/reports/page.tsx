@@ -12,12 +12,18 @@ import {
   runReport,
 } from "@/domain/reports/service"
 import { DATE_PRESETS, REPORT_TYPES } from "@/domain/reports/types"
-import { PageHeader } from "@/components/crm/shared"
+import {
+  Metric,
+  NativeSelect,
+  PageShell,
+  SectionHeader,
+  StatusBadge,
+} from "@/components/patterns"
+import { BarChart, DonutChart } from "@/components/charts"
 import { ReportResultsTable, formatSummaryValue } from "@/components/reports/report-results-table"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 const TYPE_LABEL: Record<(typeof REPORT_TYPES)[number], string> = {
   CONVERSION: "Conversion",
@@ -38,45 +44,67 @@ export default async function ReportsPage({
   const saved = await listSavedReports(ctx.organization.id, ctx.user.id)
   const query = definitionToSearchParams(type, definition).toString()
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reports"
-        description="Live queries over CRM data — conversion, first response, closed GCI, and source yield. No fabricated metrics."
-        actions={
-          <a
-            href={`/app/reports/export?${query}`}
-            className="inline-flex h-8 items-center rounded-lg border px-3 text-sm"
-          >
-            Download CSV
-          </a>
-        }
-      />
+  const conversionShareData =
+    type === "CONVERSION"
+      ? run.rows
+          .filter((r) => typeof r.count === "number" && Number(r.count) > 0)
+          .map((r) => ({
+            label: String(r.stage ?? r.key ?? "").slice(0, 12),
+            value: Number(r.count),
+          }))
+      : []
 
-      <form method="get" className="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+  const sourceCreatedData =
+    type === "SOURCE_ROI"
+      ? run.rows
+          .filter((r) => typeof r.created === "number" && Number(r.created) > 0)
+          .map((r) => ({
+            label: String(r.source ?? "").slice(0, 12) || "(none)",
+            value: Number(r.created),
+          }))
+      : []
+
+  const closedRate =
+    type === "CONVERSION" && typeof run.summary.closedRate === "number"
+      ? run.summary.closedRate
+      : null
+
+  return (
+    <PageShell
+      title="Reports"
+      description="Live queries over CRM data — conversion, first response, closed GCI, and source yield. No fabricated metrics."
+      actions={
+        <a
+          href={`/app/reports/export?${query}`}
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        >
+          Download CSV
+        </a>
+      }
+    >
+      <form
+        method="get"
+        className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-3 shadow-[var(--shadow-card)]"
+      >
         <label className="text-sm">
           <span className="mb-1 block text-xs text-muted-foreground">Report</span>
-          <select name="type" defaultValue={type} className="h-8 rounded-lg border bg-background px-2 text-sm">
+          <NativeSelect name="type" defaultValue={type} className="w-auto min-w-[140px]">
             {REPORT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-xs text-muted-foreground">Range</span>
-          <select
-            name="preset"
-            defaultValue={definition.preset}
-            className="h-8 rounded-lg border bg-background px-2 text-sm"
-          >
+          <NativeSelect name="preset" defaultValue={definition.preset} className="w-auto min-w-[120px]">
             {DATE_PRESETS.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-xs text-muted-foreground">From (custom)</span>
@@ -88,15 +116,15 @@ export default async function ReportsPage({
         </label>
         <label className="text-sm">
           <span className="mb-1 block text-xs text-muted-foreground">Pipeline</span>
-          <select
+          <NativeSelect
             name="opportunityType"
             defaultValue={definition.opportunityType ?? ""}
-            className="h-8 rounded-lg border bg-background px-2 text-sm"
+            className="w-auto min-w-[100px]"
           >
             <option value="">All</option>
             <option value="BUYER">Buyer</option>
             <option value="SELLER">Seller</option>
-          </select>
+          </NativeSelect>
         </label>
         {definition.sourceSpend
           ? Object.entries(definition.sourceSpend).map(([source, amount]) => (
@@ -115,18 +143,39 @@ export default async function ReportsPage({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {Object.entries(run.summary).map(([key, value]) => (
-          <Card key={key}>
-            <CardHeader className="pb-1">
-              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {key}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xl font-semibold tabular-nums">
-              {formatSummaryValue(key, value)}
-            </CardContent>
-          </Card>
+          <Metric key={key} label={key} value={formatSummaryValue(key, value)} />
         ))}
       </div>
+
+      {(conversionShareData.length > 0 ||
+        sourceCreatedData.length > 0 ||
+        closedRate != null) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {type === "CONVERSION" && closedRate != null ? (
+            <div className="flex items-center gap-4 rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+              <DonutChart value={closedRate * 100} max={100} label="Closed" />
+              <div>
+                <SectionHeader title="Conversion share" className="mb-1" />
+                <p className="text-sm text-muted-foreground">
+                  Closed rate from opportunities created in range (current stage snapshot).
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {conversionShareData.length > 0 ? (
+            <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
+              <SectionHeader title="Stage counts" />
+              <BarChart data={conversionShareData} height={140} />
+            </div>
+          ) : null}
+          {sourceCreatedData.length > 0 ? (
+            <div className="rounded-xl border bg-card p-4 shadow-[var(--shadow-card)] lg:col-span-2">
+              <SectionHeader title="Source · opportunities created" />
+              <BarChart data={sourceCreatedData} height={160} />
+            </div>
+          ) : null}
+        </div>
+      )}
 
       <div className="space-y-2">
         {run.caveats.map((c) => (
@@ -139,7 +188,7 @@ export default async function ReportsPage({
       <ReportResultsTable run={run} />
 
       {type === "SOURCE_ROI" && run.rows.length > 0 ? (
-        <form method="get" className="space-y-3 rounded-lg border p-3">
+        <form method="get" className="space-y-3 rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]">
           <p className="text-sm font-medium">Source spend (optional)</p>
           <p className="text-xs text-muted-foreground">
             ROI = closed GCI / spend. Leave blank to show yield only.
@@ -181,7 +230,10 @@ export default async function ReportsPage({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <form action={createSavedReportAction} className="space-y-2 rounded-lg border p-3">
+        <form
+          action={createSavedReportAction}
+          className="space-y-2 rounded-xl border bg-card p-4 shadow-[var(--shadow-card)]"
+        >
           <p className="text-sm font-medium">Save this query</p>
           <input type="hidden" name="type" value={type} />
           <input type="hidden" name="definitionJson" value={JSON.stringify(definition)} />
@@ -192,18 +244,24 @@ export default async function ReportsPage({
         </form>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium">Saved reports</p>
+          <SectionHeader title="Saved reports" />
           {saved.length === 0 ? (
             <p className="text-sm text-muted-foreground">None yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="divide-y rounded-xl border bg-card shadow-[var(--shadow-card)]">
               {saved.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
-                  <Link href={`/app/reports/${r.id}`} className="min-w-0 truncate text-sm font-medium hover:underline">
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2"
+                >
+                  <Link
+                    href={`/app/reports/${r.id}`}
+                    className="min-w-0 truncate text-sm font-medium hover:underline"
+                  >
                     {r.name}
                   </Link>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{TYPE_LABEL[r.type]}</Badge>
+                    <StatusBadge tone="outline">{TYPE_LABEL[r.type]}</StatusBadge>
                     <form action={deleteSavedReportAction}>
                       <input type="hidden" name="reportId" value={r.id} />
                       <Button type="submit" size="sm" variant="ghost">
@@ -217,6 +275,6 @@ export default async function ReportsPage({
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

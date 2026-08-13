@@ -1,9 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { EmptyState, TemperatureBadge } from "@/components/crm/shared"
+import {
+  EmptyState,
+  SearchInput,
+  StatusBadge,
+  TemperatureBadge,
+} from "@/components/patterns"
 import { StaleBadge } from "@/components/pwa/offline-banner"
-import { Badge } from "@/components/ui/badge"
+import { buttonVariants } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -14,6 +19,7 @@ import {
 } from "@/components/ui/table"
 import { useOfflineStash, useOnline } from "@/lib/offline/hooks"
 import { STASH_CONTACTS_LIST, type StashedContactListItem } from "@/lib/offline/types"
+import { cn } from "@/lib/utils"
 
 export function ContactsListOffline({
   contacts,
@@ -26,8 +32,8 @@ export function ContactsListOffline({
   const { data, savedAt, showingStash } = useOfflineStash(STASH_CONTACTS_LIST, contacts, online)
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
         {showingStash ? <StaleBadge savedAt={savedAt} /> : null}
         {!online ? (
           <span className="text-xs text-muted-foreground">Search requires a connection.</span>
@@ -35,14 +41,14 @@ export function ContactsListOffline({
       </div>
 
       {online ? (
-        <form className="mb-4 flex flex-wrap gap-2">
-          <input
+        <form className="flex flex-wrap items-center gap-2">
+          <SearchInput
             name="q"
             defaultValue={searchQ}
             placeholder="Search name, email, phone"
-            className="h-10 min-w-[220px] flex-1 rounded-lg border bg-background px-3 text-sm md:h-8"
+            className="min-w-[220px] flex-1"
           />
-          <button type="submit" className="h-10 rounded-lg border px-3 text-sm md:h-8">
+          <button type="submit" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
             Search
           </button>
         </form>
@@ -56,35 +62,44 @@ export function ContactsListOffline({
           actionLabel="Add contact"
         />
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-[var(--shadow-card)]">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-card/95 backdrop-blur">
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Stage</TableHead>
+                <TableHead className="hidden md:table-cell">Stage</TableHead>
                 <TableHead>Temp</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
+                <TableHead className="hidden sm:table-cell">Email</TableHead>
+                <TableHead className="hidden lg:table-cell">Phone</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
-                    <Link href={`/app/contacts/${c.id}`} className="font-medium hover:underline">
+                    <Link
+                      href={`/app/contacts/${c.id}`}
+                      className="font-medium text-foreground hover:underline"
+                    >
                       {c.firstName} {c.lastName}
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{c.contactType}</Badge>
+                    <StatusBadge tone="outline">{c.contactType}</StatusBadge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{c.lifecycleStage}</TableCell>
+                  <TableCell className="hidden text-muted-foreground md:table-cell">
+                    {c.lifecycleStage}
+                  </TableCell>
                   <TableCell>
-                    <TemperatureBadge value={c.temperature as never} />
+                    <TemperatureBadge value={c.temperature} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{c.email ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.phone ?? "—"}</TableCell>
+                  <TableCell className="hidden text-muted-foreground sm:table-cell">
+                    {c.email ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground lg:table-cell">
+                    {c.phone ?? "—"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
