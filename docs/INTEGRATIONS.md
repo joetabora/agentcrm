@@ -34,8 +34,8 @@ Each package exports:
 | Twilio Voice | 5 | — | Mock only (thin) |
 | Google / Microsoft Calendar | 5+ | OAuth | Deferred |
 | OpenAI / Anthropic | 7–8 | `OPENAI_API_KEY`, optional `OPENAI_MODEL` | OpenAI Chat Completions live + mock fallback; Anthropic not wired |
-| S3 / Supabase Storage | 10 docs | Keys / bucket | Adapter stub |
-| DocuSign (or similar) | 10 | OAuth / API | Adapter stub |
+| S3 / Supabase Storage | 10 docs | Keys / bucket | Mock adapter only (TransactionDocument placeholders) |
+| DocuSign (or similar) | 10 | OAuth / API | Mock esign envelopes only — no live DocuSign |
 | MLS RESO / IDX / VOW | 11 | Brokerage + MLS agreements | Adapter stub only |
 
 ## MLS / IDX

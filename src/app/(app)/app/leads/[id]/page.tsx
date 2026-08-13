@@ -2,12 +2,14 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
 import {
+  createTransactionFromOpportunityAction,
   enrollWorkflowAction,
   moveStageAction,
   reassignOpportunityAction,
   setTemperatureAction,
 } from "@/app/actions"
 import { getOpportunity } from "@/domain/opportunities/service"
+import { getTransactionByOpportunity } from "@/domain/transactions/service"
 import { listOrgMembers } from "@/domain/orgs/members"
 import { listActiveWorkflowsForManual } from "@/domain/workflows/service"
 import { requireOrgContext } from "@/server/session"
@@ -23,10 +25,11 @@ export default async function LeadDetailPage({
 }) {
   const ctx = await requireOrgContext()
   const { id } = await params
-  const [opportunity, members, manualWorkflows] = await Promise.all([
+  const [opportunity, members, manualWorkflows, linkedTx] = await Promise.all([
     getOpportunity(ctx.organization.id, id),
     listOrgMembers(ctx.organization.id),
     listActiveWorkflowsForManual(ctx.organization.id),
+    getTransactionByOpportunity(ctx.organization.id, id),
   ])
   if (!opportunity) notFound()
 
@@ -54,6 +57,23 @@ export default async function LeadDetailPage({
           <p className="text-sm text-muted-foreground">
             Assignee: {opportunity.assignedTo?.name ?? "Unassigned"}
           </p>
+          <div className="mt-3">
+            {linkedTx ? (
+              <Link
+                href={`/app/transactions/${linkedTx.id}`}
+                className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+              >
+                View transaction ({linkedTx.status})
+              </Link>
+            ) : (
+              <form action={createTransactionFromOpportunityAction}>
+                <input type="hidden" name="opportunityId" value={opportunity.id} />
+                <Button type="submit" size="sm">
+                  Open transaction
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
         <Link href="/app/leads" className="text-sm text-muted-foreground hover:underline">
           ← Back to leads

@@ -32,11 +32,11 @@ Context-aware Q&A over authorized CRM data; facts vs inference labeling; no fabr
 
 Tool execution with permission checks, confirmation for high-risk actions, audit logs.
 
-## Phase 9 — Marketing automation (current)
+## Phase 9 — Marketing automation (done)
 
 Campaigns, drips, merge variables, human approval before external send.
 
-## Phase 10 — Transactions
+## Phase 10 — Transactions (current)
 
 Offers, contracts, deadlines, checklists, parties, commission fields.
 

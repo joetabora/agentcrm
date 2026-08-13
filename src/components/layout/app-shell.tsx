@@ -17,6 +17,7 @@ import {
   Sparkles,
   Users,
   Workflow,
+  Briefcase,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ const nav = [
   { href: "/app/search", label: "Search", icon: Search },
   { href: "/app/assistant", label: "Assistant", icon: Sparkles },
   { href: "/app/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/app/transactions", label: "Transactions", icon: Briefcase },
   { href: "/app/settings/routing", label: "Routing", icon: Route },
   { href: "/app/settings/workflows", label: "Workflows", icon: Workflow },
   { href: "/app/settings/templates", label: "Templates", icon: FileText },

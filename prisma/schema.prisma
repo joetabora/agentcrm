@@ -218,6 +218,55 @@ enum MessageStatus {
   SKIPPED
 }
 
+enum TransactionStatus {
+  OPEN
+  UNDER_CONTRACT
+  CLOSED
+  FELL_THROUGH
+  CANCELLED
+}
+
+enum OfferStatus {
+  DRAFT
+  SUBMITTED
+  COUNTERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum PartyRole {
+  BUYER
+  SELLER
+  BUYER_AGENT
+  SELLER_AGENT
+  LENDER
+  ATTORNEY
+  TITLE
+  OTHER
+}
+
+enum DeadlineKind {
+  INSPECTION
+  FINANCING
+  APPRAISAL
+  EARNEST_MONEY
+  CLOSING
+  OTHER
+}
+
+enum ChecklistStatus {
+  TODO
+  DONE
+  NA
+}
+
+enum TransactionSide {
+  BUYER
+  SELLER
+  DUAL
+}
+
 // ─── Better Auth identity ─────────────────────────────────────────────────────
 
 model User {
@@ -245,6 +294,8 @@ model User {
   routingRulesTarget    RoutingRule[]  @relation("RoutingRuleTarget")
   messages              Message[]      @relation("MessageActor")
   approvedCampaigns     Campaign[]     @relation("CampaignApprover")
+  createdOffers         Offer[]        @relation("OfferCreator")
+  uploadedDocuments     TransactionDocument[] @relation("DocumentUploader")
 
   @@map("user")
 }
@@ -327,6 +378,7 @@ model Organization {
   propertyPriceEvents PropertyPriceEvent[]
   campaigns     Campaign[]
   campaignEnrollments CampaignEnrollment[]
+  transactions  Transaction[]
 }
 
 model Team {
@@ -413,6 +465,7 @@ model Contact {
   enrollments   WorkflowEnrollment[]
   campaignEnrollments CampaignEnrollment[]
   communicationThreads CommunicationThread[]
+  transactionParties TransactionParty[]
 
   @@index([organizationId])
   @@index([organizationId, lastName, firstName])
@@ -588,6 +641,7 @@ model Opportunity {
   tasks      Task[]
   enrollments WorkflowEnrollment[]
   assignmentEvents AssignmentEvent[]
+  transaction      Transaction?
 
   @@index([organizationId])
   @@index([organizationId, pipelineStageId])
@@ -634,6 +688,7 @@ model Property {
   appointments  Appointment[]
   activities    Activity[]
   priceEvents   PropertyPriceEvent[]
+  transactions  Transaction[]
 
   @@index([organizationId])
   @@index([organizationId, city, state])
@@ -840,6 +895,117 @@ model CampaignEnrollment {
   @@index([organizationId, status])
   @@index([organizationId, status, nextRunAt])
   @@index([campaignId])
+}
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+model Transaction {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunityId  String            @unique
+  opportunity    Opportunity       @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  propertyId     String?
+  property       Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  status         TransactionStatus @default(OPEN)
+  title          String
+  purchasePrice  Decimal?          @db.Decimal(14, 2)
+  closingDate    DateTime?
+  side           TransactionSide   @default(BUYER)
+  gciAmount      Decimal?          @db.Decimal(14, 2)
+  agentSplitPercent     Decimal?   @db.Decimal(5, 2)
+  brokerageSplitPercent Decimal?   @db.Decimal(5, 2)
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parties    TransactionParty[]
+  offers     Offer[]
+  deadlines  TransactionDeadline[]
+  checklist  TransactionChecklistItem[]
+  documents  TransactionDocument[]
+
+  @@index([organizationId, status])
+  @@index([propertyId])
+}
+
+model TransactionParty {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  contactId     String?
+  contact       Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  role          PartyRole
+  name          String
+  email         String?
+  isPrimary     Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+
+  @@index([transactionId])
+  @@index([contactId])
+}
+
+model Offer {
+  id              String      @id @default(cuid())
+  transactionId   String
+  transaction     Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  status          OfferStatus @default(DRAFT)
+  amount          Decimal     @db.Decimal(14, 2)
+  submittedAt     DateTime?
+  expiresAt       DateTime?
+  notes           String?
+  createdByUserId String?
+  createdBy       User?       @relation("OfferCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([transactionId])
+}
+
+model TransactionDeadline {
+  id            String       @id @default(cuid())
+  transactionId String
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  kind          DeadlineKind
+  label         String
+  dueAt         DateTime
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([transactionId])
+  @@index([dueAt])
+}
+
+model TransactionChecklistItem {
+  id            String          @id @default(cuid())
+  transactionId String
+  transaction   Transaction     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  title         String
+  status        ChecklistStatus @default(TODO)
+  sortOrder     Int             @default(0)
+  dueAt         DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([transactionId])
+}
+
+model TransactionDocument {
+  id               String      @id @default(cuid())
+  transactionId    String
+  transaction      Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  name             String
+  storageKey       String
+  contentType      String?
+  sizeBytes        Int?
+  esignEnvelopeId  String?
+  uploadedByUserId String?
+  uploadedBy       User?       @relation("DocumentUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  createdAt        DateTime    @default(now())
+
+  @@index([transactionId])
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────

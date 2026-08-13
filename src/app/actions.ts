@@ -976,3 +976,174 @@ export async function tickCampaignsAction(formData: FormData): Promise<void> {
   await tickCampaignsForOrg(ctx.organization.id)
   redirect(campaignId ? `/app/campaigns/${campaignId}` : "/app/campaigns")
 }
+
+export async function createTransactionFromOpportunityAction(
+  formData: FormData,
+): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createTransactionFromOpportunity } = await import(
+    "@/domain/transactions/service"
+  )
+  const opportunityId = String(formData.get("opportunityId") ?? "")
+  const tx = await createTransactionFromOpportunity(
+    ctx.organization.id,
+    ctx.user.id,
+    { opportunityId },
+  )
+  redirect(`/app/transactions/${tx.id}`)
+}
+
+export async function updateTransactionAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { updateTransaction } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  const purchasePriceRaw = String(formData.get("purchasePrice") ?? "").trim()
+  const gciRaw = String(formData.get("gciAmount") ?? "").trim()
+  const agentSplitRaw = String(formData.get("agentSplitPercent") ?? "").trim()
+  const brokerageSplitRaw = String(formData.get("brokerageSplitPercent") ?? "").trim()
+  const closingRaw = String(formData.get("closingDate") ?? "").trim()
+
+  await updateTransaction(ctx.organization.id, ctx.user.id, transactionId, {
+    title: String(formData.get("title") ?? "") || undefined,
+    status: (String(formData.get("status") ?? "") || undefined) as
+      | "OPEN"
+      | "UNDER_CONTRACT"
+      | "CLOSED"
+      | "FELL_THROUGH"
+      | "CANCELLED"
+      | undefined,
+    side: (String(formData.get("side") ?? "") || undefined) as
+      | "BUYER"
+      | "SELLER"
+      | "DUAL"
+      | undefined,
+    purchasePrice: purchasePriceRaw ? Number(purchasePriceRaw) : undefined,
+    gciAmount: gciRaw ? Number(gciRaw) : undefined,
+    agentSplitPercent: agentSplitRaw ? Number(agentSplitRaw) : undefined,
+    brokerageSplitPercent: brokerageSplitRaw ? Number(brokerageSplitRaw) : undefined,
+    closingDate: closingRaw ? new Date(closingRaw) : undefined,
+    notes: String(formData.get("notes") ?? "") || null,
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function addTransactionPartyAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { addParty } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  const contactId = String(formData.get("contactId") ?? "").trim() || null
+  await addParty(ctx.organization.id, ctx.user.id, transactionId, {
+    role: String(formData.get("role") ?? "OTHER") as
+      | "BUYER"
+      | "SELLER"
+      | "BUYER_AGENT"
+      | "SELLER_AGENT"
+      | "LENDER"
+      | "ATTORNEY"
+      | "TITLE"
+      | "OTHER",
+    contactId,
+    name: String(formData.get("name") ?? "") || undefined,
+    email: String(formData.get("email") ?? "") || null,
+    isPrimary: String(formData.get("isPrimary") ?? "") === "1",
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function createOfferAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createOffer } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  await createOffer(ctx.organization.id, ctx.user.id, transactionId, {
+    amount: Number(formData.get("amount")),
+    status: (String(formData.get("status") ?? "DRAFT") || "DRAFT") as
+      | "DRAFT"
+      | "SUBMITTED"
+      | "COUNTERED"
+      | "ACCEPTED"
+      | "REJECTED"
+      | "WITHDRAWN",
+    notes: String(formData.get("notes") ?? "") || null,
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function updateOfferStatusAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { updateOfferStatus } = await import("@/domain/transactions/service")
+  const offerId = String(formData.get("offerId") ?? "")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  await updateOfferStatus(ctx.organization.id, ctx.user.id, offerId, {
+    status: String(formData.get("status") ?? "DRAFT") as
+      | "DRAFT"
+      | "SUBMITTED"
+      | "COUNTERED"
+      | "ACCEPTED"
+      | "REJECTED"
+      | "WITHDRAWN",
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function addDeadlineAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { addDeadline } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  await addDeadline(ctx.organization.id, ctx.user.id, transactionId, {
+    kind: String(formData.get("kind") ?? "OTHER") as
+      | "INSPECTION"
+      | "FINANCING"
+      | "APPRAISAL"
+      | "EARNEST_MONEY"
+      | "CLOSING"
+      | "OTHER",
+    label: String(formData.get("label") ?? "").trim(),
+    dueAt: new Date(String(formData.get("dueAt") ?? "")),
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function completeDeadlineAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { completeDeadline } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  const deadlineId = String(formData.get("deadlineId") ?? "")
+  await completeDeadline(ctx.organization.id, ctx.user.id, deadlineId)
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function setChecklistStatusAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { setChecklistStatus } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  const itemId = String(formData.get("itemId") ?? "")
+  const status = String(formData.get("status") ?? "TODO") as "TODO" | "DONE" | "NA"
+  await setChecklistStatus(ctx.organization.id, ctx.user.id, itemId, status)
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function addChecklistItemAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { addChecklistItem } = await import("@/domain/transactions/service")
+  const transactionId = String(formData.get("transactionId") ?? "")
+  await addChecklistItem(ctx.organization.id, ctx.user.id, transactionId, {
+    title: String(formData.get("title") ?? "").trim(),
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}
+
+export async function createTransactionDocumentAction(
+  formData: FormData,
+): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createTransactionDocument } = await import(
+    "@/domain/transactions/documents"
+  )
+  const transactionId = String(formData.get("transactionId") ?? "")
+  await createTransactionDocument(ctx.organization.id, ctx.user.id, transactionId, {
+    name: String(formData.get("name") ?? "").trim(),
+    contentType: String(formData.get("contentType") ?? "") || null,
+    createEnvelope: String(formData.get("createEnvelope") ?? "") === "1",
+  })
+  redirect(`/app/transactions/${transactionId}`)
+}

@@ -11,7 +11,7 @@ export interface EsignProvider {
 export class MockEsignProvider implements EsignProvider {
   readonly name = "mock"
 
-  async createEnvelope(): Promise<{ id: string }> {
+  async createEnvelope(_request: EsignEnvelopeRequest): Promise<{ id: string }> {
     return { id: `mock-esign-${Date.now()}` }
   }
 }
