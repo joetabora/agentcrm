@@ -1,9 +1,19 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { format } from "date-fns"
-import { addNoteAction, enrollWorkflowAction, sendEmailAction, sendSmsAction, updateConsentAction } from "@/app/actions"
+import {
+  addNoteAction,
+  enrollWorkflowAction,
+  saveBuyerInterestAction,
+  sendEmailAction,
+  sendSmsAction,
+  updateBuyerPreferencesAction,
+  updateConsentAction,
+} from "@/app/actions"
 import { getContact } from "@/domain/contacts/service"
 import { listTemplates, listThreadsForContact } from "@/domain/comms/service"
+import { matchPropertiesForContact } from "@/domain/properties/service"
+import { safeParseBuyerPreferences } from "@/domain/properties/preferences"
 import { listActiveWorkflowsForManual } from "@/domain/workflows/service"
 import { getEmailProvider } from "@/providers/email"
 import { getSmsProvider } from "@/providers/sms"
@@ -13,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default async function ContactDetailPage({
   params,
@@ -24,13 +35,17 @@ export default async function ContactDetailPage({
   const ctx = await requireOrgContext()
   const { id } = await params
   const sp = await searchParams
-  const [contact, manualWorkflows, templates, threads] = await Promise.all([
+  const [contact, manualWorkflows, templates, threads, propertyMatches] = await Promise.all([
     getContact(ctx.organization.id, id),
     listActiveWorkflowsForManual(ctx.organization.id),
     listTemplates(ctx.organization.id),
     listThreadsForContact(ctx.organization.id, id).catch(() => []),
+    matchPropertiesForContact(ctx.organization.id, id).catch(() => []),
   ])
   if (!contact) notFound()
+
+  const prefsParsed = safeParseBuyerPreferences(contact.preferences)
+  const prefs = prefsParsed.success ? prefsParsed.data : {}
 
   const emailProvider = getEmailProvider().name
   const smsProvider = getSmsProvider().name
@@ -203,6 +218,133 @@ export default async function ContactDetailPage({
               </CardContent>
             </Card>
           ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Buyer preferences</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Fair Housing allowlist only: budget, beds, baths, type, city, ZIP, max DOM.
+              </p>
+              <form action={updateBuyerPreferencesAction} className="grid gap-3 sm:grid-cols-2">
+                <input type="hidden" name="contactId" value={contact.id} />
+                <div className="space-y-1">
+                  <Label htmlFor="budgetMin">Budget min</Label>
+                  <Input
+                    id="budgetMin"
+                    name="budgetMin"
+                    type="number"
+                    defaultValue={contact.budgetMin != null ? Number(contact.budgetMin) : ""}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="budgetMax">Budget max</Label>
+                  <Input
+                    id="budgetMax"
+                    name="budgetMax"
+                    type="number"
+                    defaultValue={contact.budgetMax != null ? Number(contact.budgetMax) : ""}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="bedsMin">Beds min</Label>
+                  <Input
+                    id="bedsMin"
+                    name="bedsMin"
+                    type="number"
+                    step="0.5"
+                    defaultValue={prefs.bedsMin ?? ""}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="bathsMin">Baths min</Label>
+                  <Input
+                    id="bathsMin"
+                    name="bathsMin"
+                    type="number"
+                    step="0.5"
+                    defaultValue={prefs.bathsMin ?? ""}
+                  />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="cities">Cities (comma-separated)</Label>
+                  <Input
+                    id="cities"
+                    name="cities"
+                    defaultValue={prefs.cities?.join(", ") ?? ""}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="zips">ZIPs</Label>
+                  <Input id="zips" name="zips" defaultValue={prefs.zips?.join(", ") ?? ""} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="propertyTypes">Property types</Label>
+                  <Input
+                    id="propertyTypes"
+                    name="propertyTypes"
+                    defaultValue={prefs.propertyTypes?.join(", ") ?? ""}
+                    placeholder="Single Family, Condo"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="maxDom">Max days on market</Label>
+                  <Input
+                    id="maxDom"
+                    name="maxDom"
+                    type="number"
+                    defaultValue={prefs.maxDom ?? ""}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" size="sm">
+                    Save preferences
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Matching properties</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {propertyMatches.length === 0 ? (
+                <p className="text-muted-foreground">
+                  No matches yet. Save preferences above; scores use org inventory only.
+                </p>
+              ) : (
+                propertyMatches.map((m) => (
+                  <div key={m.property.id} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Link
+                        href={`/app/properties/${m.property.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {m.property.line1}, {m.property.city}
+                      </Link>
+                      <Badge variant="secondary">score {m.score}</Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{m.reasons.join(" · ")}</p>
+                    <form action={saveBuyerInterestAction} className="mt-2">
+                      <input type="hidden" name="contactId" value={contact.id} />
+                      <input type="hidden" name="propertyId" value={m.property.id} />
+                      <input
+                        type="hidden"
+                        name="redirectTo"
+                        value={`/app/contacts/${contact.id}`}
+                      />
+                      <Button type="submit" size="sm" variant="outline">
+                        Save interest
+                      </Button>
+                    </form>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>

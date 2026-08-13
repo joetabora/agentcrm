@@ -11,21 +11,50 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import type { PropertyStatus } from "@/generated/prisma/client"
 
 export default async function PropertiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{
+    q?: string
+    status?: string
+    city?: string
+    minPrice?: string
+    maxPrice?: string
+  }>
 }) {
   const ctx = await requireOrgContext()
   const params = await searchParams
-  const properties = await listProperties(ctx.organization.id, { q: params.q })
+  const status =
+    params.status &&
+    [
+      "UNKNOWN",
+      "PRE_LISTING",
+      "ACTIVE",
+      "PENDING",
+      "SOLD",
+      "EXPIRED",
+      "WITHDRAWN",
+      "CANCELLED",
+      "OFF_MARKET",
+    ].includes(params.status)
+      ? (params.status as PropertyStatus)
+      : undefined
+
+  const properties = await listProperties(ctx.organization.id, {
+    q: params.q,
+    status,
+    city: params.city,
+    minPrice: params.minPrice ? Number(params.minPrice) : undefined,
+    maxPrice: params.maxPrice ? Number(params.maxPrice) : undefined,
+  })
 
   return (
     <div>
       <PageHeader
         title="Properties"
-        description="User-entered property records (MLS deferred)"
+        description="Org inventory matching — MLS deferred"
         actions={
           <Link
             href="/app/properties/new"
@@ -36,15 +65,46 @@ export default async function PropertiesPage({
         }
       />
 
-      <form className="mb-4 flex gap-2">
+      <form className="mb-4 flex flex-wrap gap-2">
         <input
           name="q"
           defaultValue={params.q}
           placeholder="Search address or city"
-          className="h-8 min-w-[220px] flex-1 rounded-lg border bg-background px-3 text-sm"
+          className="h-8 min-w-[180px] flex-1 rounded-lg border bg-background px-3 text-sm"
+        />
+        <input
+          name="city"
+          defaultValue={params.city}
+          placeholder="City exact"
+          className="h-8 w-32 rounded-lg border bg-background px-3 text-sm"
+        />
+        <select
+          name="status"
+          defaultValue={params.status ?? ""}
+          className="h-8 rounded-lg border bg-background px-2 text-sm"
+        >
+          <option value="">Any status</option>
+          <option value="ACTIVE">ACTIVE</option>
+          <option value="PENDING">PENDING</option>
+          <option value="PRE_LISTING">PRE_LISTING</option>
+          <option value="SOLD">SOLD</option>
+        </select>
+        <input
+          name="minPrice"
+          defaultValue={params.minPrice}
+          placeholder="Min $"
+          type="number"
+          className="h-8 w-24 rounded-lg border bg-background px-2 text-sm"
+        />
+        <input
+          name="maxPrice"
+          defaultValue={params.maxPrice}
+          placeholder="Max $"
+          type="number"
+          className="h-8 w-24 rounded-lg border bg-background px-2 text-sm"
         />
         <button type="submit" className="h-8 rounded-lg border px-3 text-sm">
-          Search
+          Filter
         </button>
       </form>
 

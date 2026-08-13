@@ -306,6 +306,7 @@ model Organization {
   routingRules  RoutingRule[]
   messageTemplates MessageTemplate[]
   communicationThreads CommunicationThread[]
+  propertyPriceEvents PropertyPriceEvent[]
 }
 
 model Team {
@@ -599,6 +600,7 @@ model Property {
   mlsNumber   String?
   description String?
   provenance  DataProvenance @default(USER_ENTERED)
+  listedAt    DateTime?
 
   characteristics Json?
 
@@ -610,6 +612,7 @@ model Property {
   tasks         Task[]
   appointments  Appointment[]
   activities    Activity[]
+  priceEvents   PropertyPriceEvent[]
 
   @@index([organizationId])
   @@index([organizationId, city, state])
@@ -628,6 +631,22 @@ model ContactProperty {
 
   @@unique([contactId, propertyId, role])
   @@index([propertyId])
+}
+
+model PropertyPriceEvent {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  propertyId     String
+  property       Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  price          Decimal        @db.Decimal(14, 2)
+  notedAt        DateTime       @default(now())
+  note           String?
+  provenance     DataProvenance @default(USER_ENTERED)
+  createdAt      DateTime       @default(now())
+
+  @@index([propertyId, notedAt])
+  @@index([organizationId])
 }
 
 // ─── Work & timeline ──────────────────────────────────────────────────────────

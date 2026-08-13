@@ -16,11 +16,11 @@ Prioritization heuristics (transparent), snooze/reschedule UX, recurring tasks.
 
 Generic engine: trigger → conditions → actions → delays → branches → enrollment.
 
-## Phase 5 — Communication integrations (current)
+## Phase 5 — Communication integrations (done)
 
-Email/SMS/voice providers (real credentials), threads, consent/opt-out enforcement, templates.
+Email/SMS providers (Resend/Twilio + mocks), threads, consent/opt-out, templates.
 
-## Phase 6 — Property intelligence
+## Phase 6 — Property intelligence (current)
 
 Match engine, price/DOM signals (with provenance), buyer preference evaluation.
 

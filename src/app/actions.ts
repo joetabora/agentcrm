@@ -365,6 +365,7 @@ export async function createPropertyAction(formData: FormData): Promise<void> {
     baths: formData.get("baths") ? Number(formData.get("baths")) : null,
     sqft: formData.get("sqft") ? Number(formData.get("sqft")) : null,
     listPrice: formData.get("listPrice") ? Number(formData.get("listPrice")) : null,
+    listedAt: formData.get("listedAt") || null,
     status: formData.get("status") || "UNKNOWN",
     description: formData.get("description") || null,
     contactId: formData.get("contactId") || null,
@@ -751,4 +752,62 @@ export async function updateConsentAction(formData: FormData): Promise<void> {
     consentCall: formData.get("consentCall") === "on" || formData.get("consentCall") === "true",
   })
   redirect(`/app/contacts/${contactId}`)
+}
+
+export async function updateBuyerPreferencesAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const {
+    updateBuyerPreferences,
+  } = await import("@/domain/properties/service")
+  const { parseListField } = await import("@/domain/properties/preferences")
+  const contactId = String(formData.get("contactId") ?? "")
+  const bedsMin = formData.get("bedsMin") ? Number(formData.get("bedsMin")) : undefined
+  const bathsMin = formData.get("bathsMin") ? Number(formData.get("bathsMin")) : undefined
+  const maxDom = formData.get("maxDom") ? Number(formData.get("maxDom")) : undefined
+  await updateBuyerPreferences(ctx.organization.id, ctx.user.id, contactId, {
+    budgetMin: formData.get("budgetMin") ? Number(formData.get("budgetMin")) : null,
+    budgetMax: formData.get("budgetMax") ? Number(formData.get("budgetMax")) : null,
+    preferences: {
+      bedsMin: bedsMin != null && !Number.isNaN(bedsMin) ? bedsMin : undefined,
+      bathsMin: bathsMin != null && !Number.isNaN(bathsMin) ? bathsMin : undefined,
+      maxDom: maxDom != null && !Number.isNaN(maxDom) ? maxDom : undefined,
+      cities: parseListField(String(formData.get("cities") ?? "")),
+      zips: parseListField(String(formData.get("zips") ?? "")),
+      propertyTypes: parseListField(String(formData.get("propertyTypes") ?? "")),
+    },
+  })
+  redirect(`/app/contacts/${contactId}`)
+}
+
+export async function saveBuyerInterestAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { saveBuyerInterest } = await import("@/domain/properties/service")
+  const contactId = String(formData.get("contactId") ?? "")
+  const propertyId = String(formData.get("propertyId") ?? "")
+  const redirectTo = String(formData.get("redirectTo") ?? `/app/contacts/${contactId}`)
+  await saveBuyerInterest(ctx.organization.id, ctx.user.id, contactId, propertyId)
+  redirect(redirectTo.startsWith("/app") ? redirectTo : `/app/contacts/${contactId}`)
+}
+
+export async function updateListedAtAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { updatePropertyListedAt } = await import("@/domain/properties/service")
+  const propertyId = String(formData.get("propertyId") ?? "")
+  const raw = String(formData.get("listedAt") ?? "")
+  const listedAt = raw ? new Date(raw) : null
+  await updatePropertyListedAt(ctx.organization.id, ctx.user.id, propertyId, listedAt)
+  redirect(`/app/properties/${propertyId}`)
+}
+
+export async function addPriceEventAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { addPropertyPriceEvent } = await import("@/domain/properties/service")
+  const propertyId = String(formData.get("propertyId") ?? "")
+  const price = Number(formData.get("price"))
+  if (Number.isNaN(price)) throw new Error("Invalid price")
+  await addPropertyPriceEvent(ctx.organization.id, ctx.user.id, propertyId, {
+    price,
+    note: String(formData.get("note") ?? "") || null,
+  })
+  redirect(`/app/properties/${propertyId}`)
 }

@@ -59,11 +59,15 @@ export default async function NewPropertyPage() {
                 <Input id="listPrice" name="listPrice" type="number" />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="listedAt">Listed date (for DOM)</Label>
+                <Input id="listedAt" name="listedAt" type="date" />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
                 <select
                   id="status"
                   name="status"
-                  defaultValue="UNKNOWN"
+                  defaultValue="ACTIVE"
                   className="h-8 w-full rounded-lg border bg-background px-2 text-sm"
                 >
                   {[
