@@ -8,17 +8,35 @@ Joe Intelligence should eventually combine contact + conversation + property + a
 
 ```
 AIProvider
-  ├── OpenAIProvider
-  ├── AnthropicProvider
-  └── MockAIProvider (development)
+  ├── OpenAIProvider   (OPENAI_API_KEY set)
+  ├── AnthropicProvider (not wired yet)
+  └── MockAIProvider   (default when no key)
 ```
 
-Application code never imports a vendor SDK directly outside `src/providers/ai`.
+Application code never imports a vendor SDK directly outside `src/providers/ai`. Phase 7 uses the documented OpenAI Chat Completions HTTP API (`POST /v1/chat/completions`).
+
+Env:
+
+- `OPENAI_API_KEY` — enables live answers
+- `OPENAI_MODEL` — default `gpt-4o-mini`
 
 Model selection by task:
 
-- Fast/cheap: classification, extraction, summarization
-- Advanced: reasoning, complex planning
+- Fast/cheap: classification, extraction, Q&A (Phase 7)
+- Advanced: reasoning, complex planning (later)
+
+## Phase 7 — grounded assistant
+
+Flow:
+
+1. `requireOrgContext`
+2. `buildCrmContext` — org-scoped snippets (contact, facts, prefs, opportunities, tasks, activities, properties, keyword search hits)
+3. Refuse if context pack is empty
+4. `AIProvider.complete` with system prompt requiring FACT / CALCULATION / INFERENCE / UNKNOWN labels
+5. Zod-parse JSON response; on failure → safe refuse
+6. `AuditLog` with `source: AI`, `entityType: AssistantQuery`
+
+UI: `/app/assistant` (+ `?contactId=` deep link). **No tool calling / CRM mutations by the model** (Phase 8). Optional “Save as ContactFact” is a separate human-confirmed write (`source: AI`, `provenance: AI_INFERENCE`).
 
 ## Fact vs inference
 
@@ -40,9 +58,9 @@ Structured facts:
 - confidence
 - createdAt / lastVerifiedAt
 
-Phase 1: table exists; UI shows facts only. No LLM writes.
+Phase 7: LLM never auto-writes facts. Contact detail “AI Brief” stays deterministic; Assistant handles Q&A.
 
-## Action system (future)
+## Action system (Phase 8+)
 
 ```
 Intent → Permission check → Tool → Action → Audit log → Result
@@ -52,12 +70,6 @@ High-risk/external actions require confirmation by default.
 
 Examples of future tools: create task, draft email, enroll workflow, match buyers.
 
-## Phase 1 policy
-
-- No LLM API calls.
-- Contact detail “AI Brief” = structured placeholders + stored facts.
-- MockAIProvider returns empty/safe stubs for tests.
-
 ## Fair Housing & safety
 
-Property recommendations must not use protected characteristics or prohibited proxies. See [COMPLIANCE.md](./COMPLIANCE.md).
+Property recommendations must not use protected characteristics or prohibited proxies. Assistant system prompt forbids protected-class reasoning; property answers stick to stored inventory fields only. See [COMPLIANCE.md](./COMPLIANCE.md).

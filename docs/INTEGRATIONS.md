@@ -33,7 +33,7 @@ Each package exports:
 | Twilio SMS | 5 | Account SID, auth, from number | Live adapter + mock fallback; STOP webhook |
 | Twilio Voice | 5 | — | Mock only (thin) |
 | Google / Microsoft Calendar | 5+ | OAuth | Deferred |
-| OpenAI / Anthropic | 7–8 | API keys | Adapter stub |
+| OpenAI / Anthropic | 7–8 | `OPENAI_API_KEY`, optional `OPENAI_MODEL` | OpenAI Chat Completions live + mock fallback; Anthropic not wired |
 | S3 / Supabase Storage | 10 docs | Keys / bucket | Adapter stub |
 | DocuSign (or similar) | 10 | OAuth / API | Adapter stub |
 | MLS RESO / IDX / VOW | 11 | Brokerage + MLS agreements | Adapter stub only |

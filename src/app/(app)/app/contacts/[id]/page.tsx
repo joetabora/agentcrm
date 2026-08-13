@@ -399,6 +399,16 @@ export default async function ContactDetailPage({
               <CardTitle className="text-base">AI Brief</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                Deterministic summary from CRM fields only. For grounded Q&amp;A, use{" "}
+                <Link
+                  href={`/app/assistant?contactId=${contact.id}`}
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Ask about this contact
+                </Link>
+                .
+              </p>
               <div>
                 <p className="font-medium">Who is this?</p>
                 <p className="text-muted-foreground">
@@ -411,14 +421,15 @@ export default async function ContactDetailPage({
                 <p className="text-muted-foreground">
                   {contact.motivation ||
                     contact.notesSummary ||
-                    "No stored preferences yet. Add notes or facts — AI generation is deferred."}
+                    "No stored preferences yet. Add notes or facts."}
                 </p>
               </div>
               <div>
                 <p className="font-medium">Stored facts</p>
                 {contact.facts.length === 0 ? (
                   <p className="text-muted-foreground">
-                    No ContactFact records. Phase 1 does not invent summaries.
+                    No ContactFact records yet. Confirm suggestions from the Assistant to save
+                    facts.
                   </p>
                 ) : (
                   <ul className="mt-1 space-y-1">

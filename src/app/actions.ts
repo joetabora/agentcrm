@@ -811,3 +811,39 @@ export async function addPriceEventAction(formData: FormData): Promise<void> {
   })
   redirect(`/app/properties/${propertyId}`)
 }
+
+export async function askAssistantAction(input: {
+  question: string
+  contactId?: string | null
+  opportunityId?: string | null
+}) {
+  const ctx = await requireOrgContext()
+  const { askAssistant } = await import("@/domain/ai/assistant")
+  return askAssistant({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    question: input.question,
+    contactId: input.contactId || null,
+    opportunityId: input.opportunityId || null,
+  })
+}
+
+export async function createContactFactAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { createContactFact } = await import("@/domain/ai/assistant")
+  const contactId = String(formData.get("contactId") ?? "")
+  const statement = String(formData.get("statement") ?? "")
+  const fromAi = String(formData.get("fromAi") ?? "") === "1"
+  const redirectTo = String(formData.get("redirectTo") ?? "")
+  const fact = await createContactFact({
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.user.id,
+    contactId,
+    statement,
+    fromAi,
+  })
+  if (!fact) redirect("/app/contacts?error=not_found")
+  redirect(
+    redirectTo.startsWith("/app/") ? redirectTo : `/app/contacts/${contactId}`,
+  )
+}

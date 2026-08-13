@@ -20,11 +20,11 @@ Generic engine: trigger → conditions → actions → delays → branches → e
 
 Email/SMS providers (Resend/Twilio + mocks), threads, consent/opt-out, templates.
 
-## Phase 6 — Property intelligence (current)
+## Phase 6 — Property intelligence (done)
 
 Match engine, price/DOM signals (with provenance), buyer preference evaluation.
 
-## Phase 7 — AI assistant
+## Phase 7 — AI assistant (current)
 
 Context-aware Q&A over authorized CRM data; facts vs inference labeling; no fabrication.
 

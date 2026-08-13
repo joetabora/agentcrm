@@ -13,6 +13,7 @@ import {
   Menu,
   Route,
   Search,
+  Sparkles,
   Users,
   Workflow,
 } from "lucide-react"
@@ -30,6 +31,7 @@ const nav = [
   { href: "/app/properties", label: "Properties", icon: Building2 },
   { href: "/app/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/app/search", label: "Search", icon: Search },
+  { href: "/app/assistant", label: "Assistant", icon: Sparkles },
   { href: "/app/settings/routing", label: "Routing", icon: Route },
   { href: "/app/settings/workflows", label: "Workflows", icon: Workflow },
   { href: "/app/settings/templates", label: "Templates", icon: FileText },
