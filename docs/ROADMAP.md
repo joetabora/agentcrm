@@ -4,11 +4,11 @@
 
 Auth, org tenancy, contacts (+ detail), properties, leads/pipeline, tasks, appointments, activity timeline, dashboard, search, seed, tests. Deployed to Vercel + Supabase.
 
-## Phase 2 — Lead management + pipeline polish (current)
+## Phase 2 — Lead management + pipeline polish (done)
 
 Saved views, bulk actions, routing rules UI, richer filters, assignment audit UX, pipeline stage config.
 
-## Phase 3 — Tasks + daily agenda intelligence
+## Phase 3 — Tasks + daily agenda intelligence (current)
 
 Prioritization heuristics (transparent), snooze/reschedule UX, recurring tasks.
 

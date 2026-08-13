@@ -94,6 +94,13 @@ enum TaskPriority {
   URGENT
 }
 
+enum TaskRecurrenceRule {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 enum AppointmentStatus {
   SCHEDULED
   COMPLETED
@@ -649,13 +656,19 @@ model Task {
   dueAt       DateTime?
   completedAt DateTime?
   snoozedUntil DateTime?
+  recurrenceRule     TaskRecurrenceRule @default(NONE)
+  recurrenceParentId String?
+  recurrenceParent   Task?              @relation("TaskRecurrence", fields: [recurrenceParentId], references: [id], onDelete: SetNull)
+  recurrenceChildren Task[]             @relation("TaskRecurrence")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([organizationId, status, dueAt])
+  @@index([organizationId, status, snoozedUntil])
   @@index([assigneeUserId])
   @@index([contactId])
+  @@index([recurrenceParentId])
 }
 
 model Appointment {

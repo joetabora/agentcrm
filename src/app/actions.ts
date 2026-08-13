@@ -30,11 +30,18 @@ import {
 } from "@/domain/routing/service"
 import { createProperty, createPropertySchema } from "@/domain/properties/service"
 import {
+  cancelAppointment,
+  cancelTask,
+  completeAppointment,
   completeTask,
   createAppointment,
   createAppointmentSchema,
   createTask,
   createTaskSchema,
+  rescheduleAppointment,
+  rescheduleTask,
+  resolveSnoozeUntil,
+  snoozeTask,
 } from "@/domain/tasks/service"
 import { addNote, createNoteSchema } from "@/domain/activities/service"
 import { requireOrgContext, requireSession } from "@/server/session"
@@ -373,6 +380,7 @@ export async function createTaskAction(formData: FormData): Promise<void> {
     contactId: formData.get("contactId") || null,
     opportunityId: formData.get("opportunityId") || null,
     propertyId: formData.get("propertyId") || null,
+    recurrenceRule: formData.get("recurrenceRule") || "NONE",
   })
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? "Invalid input")
@@ -381,11 +389,44 @@ export async function createTaskAction(formData: FormData): Promise<void> {
   redirect("/app/tasks")
 }
 
+function taskRedirect(formData: FormData) {
+  const to = String(formData.get("redirectTo") ?? "/app/tasks")
+  return to.startsWith("/app") ? to : "/app/tasks"
+}
+
 export async function completeTaskAction(formData: FormData): Promise<void> {
   const ctx = await requireOrgContext()
   const taskId = String(formData.get("taskId") ?? "")
   await completeTask(ctx.organization.id, ctx.user.id, taskId)
-  redirect("/app/tasks")
+  redirect(taskRedirect(formData))
+}
+
+export async function snoozeTaskAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const taskId = String(formData.get("taskId") ?? "")
+  const preset = String(formData.get("preset") ?? "tomorrow")
+  const customRaw = formData.get("snoozedUntil")
+  const customUntil =
+    typeof customRaw === "string" && customRaw.length > 0 ? new Date(customRaw) : null
+  const until = resolveSnoozeUntil(preset, customUntil)
+  await snoozeTask(ctx.organization.id, ctx.user.id, taskId, until)
+  redirect(taskRedirect(formData))
+}
+
+export async function rescheduleTaskAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const taskId = String(formData.get("taskId") ?? "")
+  const dueAt = new Date(String(formData.get("dueAt") ?? ""))
+  if (Number.isNaN(dueAt.getTime())) throw new Error("Invalid due date")
+  await rescheduleTask(ctx.organization.id, ctx.user.id, taskId, dueAt)
+  redirect(taskRedirect(formData))
+}
+
+export async function cancelTaskAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const taskId = String(formData.get("taskId") ?? "")
+  await cancelTask(ctx.organization.id, ctx.user.id, taskId)
+  redirect(taskRedirect(formData))
 }
 
 export async function createAppointmentAction(formData: FormData): Promise<void> {
@@ -404,4 +445,36 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
   }
   await createAppointment(ctx.organization.id, ctx.user.id, parsed.data)
   redirect("/app/tasks")
+}
+
+export async function completeAppointmentAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const appointmentId = String(formData.get("appointmentId") ?? "")
+  await completeAppointment(ctx.organization.id, ctx.user.id, appointmentId)
+  redirect(taskRedirect(formData))
+}
+
+export async function cancelAppointmentAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const appointmentId = String(formData.get("appointmentId") ?? "")
+  await cancelAppointment(ctx.organization.id, ctx.user.id, appointmentId)
+  redirect(taskRedirect(formData))
+}
+
+export async function rescheduleAppointmentAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const appointmentId = String(formData.get("appointmentId") ?? "")
+  const startsAt = new Date(String(formData.get("startsAt") ?? ""))
+  const endsRaw = formData.get("endsAt")
+  const endsAt =
+    typeof endsRaw === "string" && endsRaw.length > 0 ? new Date(endsRaw) : null
+  if (Number.isNaN(startsAt.getTime())) throw new Error("Invalid start time")
+  await rescheduleAppointment(
+    ctx.organization.id,
+    ctx.user.id,
+    appointmentId,
+    startsAt,
+    endsAt,
+  )
+  redirect(taskRedirect(formData))
 }

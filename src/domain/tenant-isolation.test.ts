@@ -8,7 +8,7 @@ import {
   listOpportunities,
   moveOpportunityStage,
 } from "@/domain/opportunities/service"
-import { createTask, listTasks, completeTask } from "@/domain/tasks/service"
+import { createTask, listTasks, completeTask, snoozeTask } from "@/domain/tasks/service"
 import { globalSearch } from "@/domain/search/service"
 
 const suffix = Date.now().toString(36)
@@ -145,7 +145,7 @@ describe("tenant isolation + core domain", () => {
     expect(tasksB.some((t) => t.id === task.id)).toBe(false)
 
     const completed = await completeTask(orgAId, userAId, task.id)
-    expect(completed?.status).toBe("COMPLETED")
+    expect(completed?.task.status).toBe("COMPLETED")
   })
 
   it("search respects organizationId", async () => {
@@ -178,5 +178,32 @@ describe("tenant isolation + core domain", () => {
     const refreshedB = await prisma.opportunity.findUniqueOrThrow({ where: { id: oppB.id } })
     expect(refreshedA.temperature).toBe("HOT")
     expect(refreshedB.temperature).toBe("COLD")
+  })
+
+  it("snooze and recurrence stay tenant-scoped", async () => {
+    const taskA = await createTask(orgAId, userAId, {
+      title: `Recurring ${suffix}`,
+      priority: "HIGH",
+      dueAt: new Date(),
+      recurrenceRule: "WEEKLY",
+      contactId: contactAId,
+    })
+    const until = new Date(Date.now() + 60_000)
+    const snoozed = await snoozeTask(orgAId, userAId, taskA.id, until)
+    expect(snoozed?.status).toBe("SNOOZED")
+
+    const cross = await snoozeTask(orgBId, userBId, taskA.id, until)
+    expect(cross).toBeNull()
+
+    // Force open to complete with recurrence
+    await prisma.task.update({
+      where: { id: taskA.id },
+      data: { status: "OPEN", snoozedUntil: null },
+    })
+    const done = await completeTask(orgAId, userAId, taskA.id)
+    expect(done?.task.status).toBe("COMPLETED")
+    expect(done?.nextTask?.organizationId).toBe(orgAId)
+    expect(done?.nextTask?.recurrenceRule).toBe("WEEKLY")
+    expect(done?.nextTask?.recurrenceParentId).toBe(taskA.id)
   })
 })

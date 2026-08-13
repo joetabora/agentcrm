@@ -1,52 +1,39 @@
 import { prisma } from "@/lib/db"
 import { endOfDay, startOfDay, subDays } from "date-fns"
+import { getRankedAgenda } from "@/domain/agenda/service"
+import { unsnoozeDueTasks } from "@/domain/tasks/service"
 
-export async function getDashboardData(organizationId: string) {
+export async function getDashboardData(organizationId: string, currentUserId?: string) {
   const now = new Date()
   const todayStart = startOfDay(now)
   const todayEnd = endOfDay(now)
   const fourteenDaysAgo = subDays(now, 14)
 
+  await unsnoozeDueTasks(organizationId)
+
   const [
-    tasksDueToday,
+    agenda,
     overdueTasks,
-    appointmentsToday,
     newLeads,
     hotLeads,
     uncontactedLeads,
-    overdueFollowUps,
     buyerCount,
     sellerCount,
     openOpportunityCount,
   ] = await Promise.all([
-    prisma.task.findMany({
-      where: {
-        organizationId,
-        status: "OPEN",
-        dueAt: { gte: todayStart, lte: todayEnd },
-      },
-      include: { contact: true },
-      orderBy: { dueAt: "asc" },
-      take: 20,
+    getRankedAgenda(organizationId, {
+      assigneeUserId: currentUserId,
+      limit: 20,
     }),
     prisma.task.findMany({
       where: {
         organizationId,
         status: "OPEN",
         dueAt: { lt: todayStart },
+        ...(currentUserId ? { assigneeUserId: currentUserId } : {}),
       },
       include: { contact: true },
       orderBy: { dueAt: "asc" },
-      take: 20,
-    }),
-    prisma.appointment.findMany({
-      where: {
-        organizationId,
-        status: "SCHEDULED",
-        startsAt: { gte: todayStart, lte: todayEnd },
-      },
-      include: { contact: true, property: true },
-      orderBy: { startsAt: "asc" },
       take: 20,
     }),
     prisma.opportunity.findMany({
@@ -77,15 +64,6 @@ export async function getDashboardData(organizationId: string) {
       include: { contact: true, pipelineStage: true },
       take: 20,
     }),
-    prisma.opportunity.findMany({
-      where: {
-        organizationId,
-        nextActionAt: { lt: now },
-        pipelineStage: { isTerminal: false },
-      },
-      include: { contact: true, pipelineStage: true },
-      take: 20,
-    }),
     prisma.opportunity.count({
       where: {
         organizationId,
@@ -108,7 +86,6 @@ export async function getDashboardData(organizationId: string) {
     }),
   ])
 
-  // Cold contacts: no activity in 14 days (attention signal)
   const coldContacts = await prisma.contact.findMany({
     where: {
       organizationId,
@@ -122,15 +99,18 @@ export async function getDashboardData(organizationId: string) {
     orderBy: { lastContactedAt: "asc" },
   })
 
+  const overdueFollowUps = agenda.ranked.filter((i) => i.kind === "follow_up")
+
   return {
-    tasksDueToday,
+    rankedAgenda: agenda.ranked,
+    appointmentsToday: agenda.appointmentsToday,
     overdueTasks,
-    appointmentsToday,
+    overdueFollowUps,
     newLeads,
     hotLeads,
     uncontactedLeads,
-    overdueFollowUps,
     coldContacts,
+    todayWindow: { start: todayStart, end: todayEnd },
     pipeline: {
       buyers: buyerCount,
       sellers: sellerCount,
