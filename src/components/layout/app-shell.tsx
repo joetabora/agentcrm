@@ -4,12 +4,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   Building2,
+  Briefcase,
   CheckSquare,
   Contact,
   FileText,
   Home,
   Kanban,
   LayoutDashboard,
+  Library,
   Megaphone,
   Menu,
   Route,
@@ -17,7 +19,6 @@ import {
   Sparkles,
   Users,
   Workflow,
-  Briefcase,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -39,6 +40,7 @@ const nav = [
   { href: "/app/settings/routing", label: "Routing", icon: Route },
   { href: "/app/settings/workflows", label: "Workflows", icon: Workflow },
   { href: "/app/settings/templates", label: "Templates", icon: FileText },
+  { href: "/app/settings/mls", label: "MLS", icon: Library },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

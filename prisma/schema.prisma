@@ -677,6 +677,11 @@ model Property {
   provenance  DataProvenance @default(USER_ENTERED)
   listedAt    DateTime?
 
+  mlsSource       String?
+  mlsListingKey   String?
+  mlsAttribution  String?
+  mlsLastSyncedAt DateTime?
+
   characteristics Json?
 
   createdAt DateTime @default(now())
@@ -693,6 +698,7 @@ model Property {
   @@index([organizationId])
   @@index([organizationId, city, state])
   @@index([organizationId, postalCode])
+  @@index([organizationId, mlsNumber])
 }
 
 model ContactProperty {

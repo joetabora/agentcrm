@@ -44,7 +44,7 @@
 
 | Model | Purpose |
 |-------|---------|
-| Property | Address + characteristics + listing fields (user-entered Phase 1) |
+| Property | Address + characteristics + listing fields; optional MLS attribution (`mlsSource`, `mlsListingKey`, `mlsAttribution`, `mlsLastSyncedAt`) |
 | ContactProperty | M:N with role (owner, buyer_interest, listing_client, …) |
 
 ### Work & history

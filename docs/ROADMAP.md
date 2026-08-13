@@ -36,11 +36,11 @@ Tool execution with permission checks, confirmation for high-risk actions, audit
 
 Campaigns, drips, merge variables, human approval before external send.
 
-## Phase 10 — Transactions (current)
+## Phase 10 — Transactions (done)
 
 Offers, contracts, deadlines, checklists, parties, commission fields.
 
-## Phase 11 — MLS / IDX
+## Phase 11 — MLS / IDX (current)
 
 Authorized RESO/IDX/VOW only. No scraping. Clear data attribution.
 

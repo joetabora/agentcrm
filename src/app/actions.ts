@@ -1147,3 +1147,34 @@ export async function createTransactionDocumentAction(
   })
   redirect(`/app/transactions/${transactionId}`)
 }
+
+export async function syncMlsAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { syncFromProvider } = await import("@/domain/mls/service")
+  const mlsNumber = String(formData.get("mlsNumber") ?? "").trim() || undefined
+  const postalCode = String(formData.get("postalCode") ?? "").trim() || undefined
+  await syncFromProvider(ctx.organization.id, ctx.user.id, {
+    mlsNumber,
+    postalCode,
+  })
+  redirect("/app/settings/mls?synced=1")
+}
+
+export async function importMlsJsonAction(formData: FormData): Promise<void> {
+  const ctx = await requireOrgContext()
+  const { importResoJson } = await import("@/domain/mls/service")
+  const raw = String(formData.get("json") ?? "").trim()
+  let payload: unknown
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    redirect("/app/settings/mls?error=invalid_json")
+  }
+  const result = await importResoJson(ctx.organization.id, ctx.user.id, payload)
+  if (result.upserted === 0) {
+    redirect(
+      `/app/settings/mls?error=${encodeURIComponent(result.errors[0]?.error ?? "no_rows")}`,
+    )
+  }
+  redirect(`/app/settings/mls?imported=${result.upserted}`)
+}

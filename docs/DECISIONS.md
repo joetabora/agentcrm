@@ -41,6 +41,6 @@
 
 ## ADR-007: No MLS until authorized
 
-**Status:** Accepted  
-**Decision:** `MlsProvider` mock only until brokerage/MLS credentials and agreements exist.  
-**Consequences:** Properties are user-entered in Phase 1.
+**Status:** Accepted (updated Phase 11)  
+**Decision:** Live RESO client only when brokerage/MLS credentials are configured. Default provider is a **labeled fixture** feed (`MOCK_FIXTURE`) plus manual RESO-shaped JSON import. Never scrape portals; never present fixtures as real MLS.  
+**Consequences:** Properties may be user-entered or `IMPORTED` with `mlsAttribution` / `mlsSource` / `mlsListingKey`.

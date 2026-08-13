@@ -54,7 +54,7 @@ export default async function PropertiesPage({
     <div>
       <PageHeader
         title="Properties"
-        description="Org inventory matching — MLS deferred"
+        description="Org inventory. Use Settings → MLS for authorized fixture/RESO sync and JSON import."
         actions={
           <Link
             href="/app/properties/new"

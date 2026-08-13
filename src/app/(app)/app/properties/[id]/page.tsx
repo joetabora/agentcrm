@@ -41,12 +41,25 @@ export default async function PropertyDetailPage({
         <div className="mt-2 flex flex-wrap gap-2">
           <Badge variant="secondary">{property.status}</Badge>
           <Badge variant="outline">{property.provenance}</Badge>
+          {property.mlsSource ? (
+            <Badge variant="outline">MLS {property.mlsSource}</Badge>
+          ) : null}
           {dom != null ? (
             <Badge variant="outline">DOM {dom}d · CALCULATED</Badge>
           ) : (
             <Badge variant="outline">DOM unknown</Badge>
           )}
         </div>
+        {property.mlsAttribution ? (
+          <p className="mt-2 text-sm text-muted-foreground">{property.mlsAttribution}</p>
+        ) : null}
+        {property.mlsLastSyncedAt ? (
+          <p className="text-xs text-muted-foreground">
+            MLS last synced {format(property.mlsLastSyncedAt, "MMM d, yyyy HH:mm")}
+            {property.mlsNumber ? ` · #${property.mlsNumber}` : ""}
+            {property.mlsListingKey ? ` · key ${property.mlsListingKey}` : ""}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

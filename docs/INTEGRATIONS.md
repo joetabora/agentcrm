@@ -36,11 +36,11 @@ Each package exports:
 | OpenAI / Anthropic | 7–8 | `OPENAI_API_KEY`, optional `OPENAI_MODEL` | OpenAI Chat Completions live + mock fallback; Anthropic not wired |
 | S3 / Supabase Storage | 10 docs | Keys / bucket | Mock adapter only (TransactionDocument placeholders) |
 | DocuSign (or similar) | 10 | OAuth / API | Mock esign envelopes only — no live DocuSign |
-| MLS RESO / IDX / VOW | 11 | Brokerage + MLS agreements | Adapter stub only |
+| MLS RESO / IDX / VOW | 11 | `MLS_RESO_BASE_URL` + token or client credentials; brokerage agreements | Fixture provider by default; optional RESO Web API client; manual JSON import; **no scraping** |
 
 ## MLS / IDX
 
-Must wait for authorized access. Supported conceptual feeds: RESO Web API, IDX, VOW. All MLS-derived data must be attributable and rule-compliant. **No unauthorized scraping.**
+Must wait for authorized access for live feeds. Supported: RESO Web API (env-gated), fixture mode for development, manual RESO-shaped JSON import. All MLS-derived rows use `provenance: IMPORTED` and display `mlsAttribution`. **No unauthorized scraping.**
 
 ## Webhooks (future)
 
