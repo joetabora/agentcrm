@@ -12,6 +12,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  trustedOrigins: [
+    process.env.BETTER_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    "https://agentcrm-roan.vercel.app",
+  ].filter((v): v is string => Boolean(v)),
   plugins: [nextCookies()],
 })
 

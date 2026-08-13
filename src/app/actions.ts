@@ -34,27 +34,29 @@ export async function signUpAction(formData: FormData): Promise<void> {
     String(formData.get("organizationName") ?? "").trim() || `${name}'s Realty`
 
   if (!name || !email || password.length < 8) {
-    throw new Error("Name, email, and a password of at least 8 characters are required.")
+    redirect("/sign-up?error=missing_fields")
   }
 
+  let userId: string
   try {
-    await auth.api.signUpEmail({
+    // nextCookies() sets the session cookie on the response. Do not call
+    // getSession() with the incoming request headers — they won't include it yet.
+    const created = await auth.api.signUpEmail({
       body: { name, email, password },
       headers: await headers(),
     })
+    if (!created?.user?.id) {
+      redirect("/sign-up?error=signup_failed")
+    }
+    userId = created.user.id
   } catch {
-    throw new Error("Could not create account. Email may already be in use.")
+    redirect("/sign-up?error=signup_failed")
   }
 
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) {
-    throw new Error("Account created but session was not established. Please sign in.")
-  }
-
-  const existing = await getMembershipForUser(session.user.id)
+  const existing = await getMembershipForUser(userId)
   if (!existing) {
     await createOrganizationForUser({
-      userId: session.user.id,
+      userId,
       name: organizationName,
     })
   }
@@ -66,13 +68,27 @@ export async function signInAction(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase()
   const password = String(formData.get("password") ?? "")
 
+  let userId: string
   try {
-    await auth.api.signInEmail({
+    const signedIn = await auth.api.signInEmail({
       body: { email, password },
       headers: await headers(),
     })
+    if (!signedIn?.user?.id) {
+      redirect("/sign-in?error=invalid_credentials")
+    }
+    userId = signedIn.user.id
   } catch {
-    throw new Error("Invalid email or password.")
+    redirect("/sign-in?error=invalid_credentials")
+  }
+
+  // Repair accounts created before org provisioning succeeded
+  const existing = await getMembershipForUser(userId)
+  if (!existing) {
+    await createOrganizationForUser({
+      userId,
+      name: `${email.split("@")[0]}'s Realty`,
+    })
   }
 
   redirect("/app")

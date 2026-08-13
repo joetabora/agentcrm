@@ -5,7 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export default function SignUpPage() {
+const ERRORS: Record<string, string> = {
+  missing_fields: "Name, email, and a password of at least 8 characters are required.",
+  signup_failed: "Could not create account. Try signing in if you already registered.",
+}
+
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const params = await searchParams
+  const errorMessage = params.error ? ERRORS[params.error] ?? "Something went wrong." : null
+
   return (
     <main className="mx-auto flex min-h-screen max-w-md items-center px-4 py-10">
       <Card className="w-full">
@@ -16,6 +28,11 @@ export default function SignUpPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMessage ? (
+            <p className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {errorMessage}
+            </p>
+          ) : null}
           <form action={signUpAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Your name</Label>
